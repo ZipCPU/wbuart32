@@ -1,0 +1,473 @@
+\documentclass{gqtekspec}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% Filename: 	spec.tex
+%%
+%% Project:	wbuart32, a full featured UART with simulator
+%%
+%% Purpose:	To describe, for LaTeX, how to build the specification file
+%%		for the wbuart32 core(s).  This file is not nearly as
+%%	interesting as the file it creates, so I suggest you read spec.pdf
+%%	first, before deciding you are really interested in this file.
+%%
+%% Creator:	Dan Gisselquist, Ph.D.
+%%		Gisselquist Technology, LLC
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% Copyright (C) 2015-2016, Gisselquist Technology, LLC
+%%
+%% This program is free software (firmware): you can redistribute it and/or
+%% modify it under the terms of  the GNU General Public License as published
+%% by the Free Software Foundation, either version 3 of the License, or (at
+%% your option) any later version.
+%%
+%% This program is distributed in the hope that it will be useful, but WITHOUT
+%% ANY WARRANTY; without even the implied warranty of MERCHANTIBILITY or
+%% FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+%% for more details.
+%%
+%% You should have received a copy of the GNU General Public License along
+%% with this program.  (It's in the $(ROOT)/doc directory, run make with no
+%% target there if the PDF file isn't present.)  If not, see
+%% <http://www.gnu.org/licenses/> for a copy.
+%%
+%% License:	GPL, v3, as defined and found on www.gnu.org,
+%%		http://www.gnu.org/licenses/gpl.html
+%%
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%%
+\usepackage{import}
+\usepackage{bytefield}
+\usepackage{amsmath}
+\project{WBUART32}
+\title{Specification}
+\author{Dan Gisselquist, Ph.D.}
+\email{dgisselq (at) opencores.org}
+\revision{Rev.~0.1}
+\begin{document}
+\pagestyle{gqtekspecplain}
+\titlepage
+\begin{license}
+Copyright (C) \theyear\today, Gisselquist Technology, LLC.
+
+This project is free software (firmware): you can redistribute it and/or
+modify it under the terms of  the GNU General Public License as published
+by the Free Software Foundation, either version 3 of the License, or (at
+your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTIBILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program.  If not, see \texttt{http://www.gnu.org/licenses/} for a copy.
+\end{license}
+\begin{revisionhistory}
+0.1 & 8/26/2016 & D. Gisselquist & Initial Draft Specification\\\hline
+\end{revisionhistory}
+% Revision History
+% Table of Contents, named Contents
+\tableofcontents
+\listoffigures
+\listoftables
+\begin{preface}
+It may be that building a UART is a mandatory coming of age task for any HDL
+designer.  The task is simple, easy, and there's not all that much to it. 
+This project comes out of some of my first experiences with Verilog.
+
+Since then, it has been augmented with a very useful capability for 
+simulating a UART connection when using Verilator.  It is this, perhaps
+unusual, addition to the core set that makes this core worth taking note of.
+
+I hope you find it useful.
+\end{preface}
+
+\chapter{Introduction}\label{ch:intro}
+\pagenumbering{arabic}
+\setcounter{page}{1}
+%
+% Introduction
+%
+% This section contains the introduction to the core, describing both its
+% use and its features.
+%
+
+% What is old
+The Universal Asynchronous Serial Transport, or UART, has become quite the
+common protocol between devices.  It is simple to wire up, easy to use, and
+easy to process.  This core provides one implementation of the logic necessary
+to use such a communications scheme.
+
+% What does the old lack?
+% What is new
+% What does the new have that the old lacks
+% What performance gain can be expected?
+
+While you are likely to find many UART examples out there, this particular
+UART implementation offers something many of these other examples do not: a
+Verilator simulation capability.  This will allow the user to connect, via
+a TCP/IP port or a telnet application, to the UART of their desired chip.  As
+a result, full two-way interaction can be had between a simulation and a
+terminal or other port.  Indeed, this may even be sufficient to connect a 
+CPU, capable of running Linux, to a terminal to verify that yes it can truly
+run Linux--all within Verilator.
+
+\chapter{Architecture}\label{ch:arch}
+
+The HDL portion of the core itself consists of three files: {\tt rxuart.v},
+{\tt txuart.v}, and {\tt wbuart-insert.v}.  These are, respectively, the
+receive UART code, the transmit UART code, and an example of how the receiver
+and transmitter may be connected to a Wishbone bus.
+
+Each of the core files, {\tt rxuart.v} and {\tt txuart.v}, are fully capable.
+They each accept a 29--bit setup value specifying baud rate, the number of bits
+per byte (between 5 and 8), whether or not parity is used, whether that parity
+is even, odd, or fixed mark or fixed space.  This setup register will be
+discussed further in Chap.\ref{ch:registers}.
+
+A further note on the {\tt rxuart.v} module is in order.  This module double
+latches the input, in the proper two buffer fashion to avoid problems with
+metastability.  Then, upon the detection of the start bit (i.e. a high to low
+transition), the port waits a half of a baud, and then starts its baud clock
+so as to sample in the middle of every baud following.  The result of this is
+a timing requirement: after $N+2$ baud intervals ($N+3$ if parity is used),
+where $N$ is the number of bits per byte, this calculated middle sample must
+still lie within the associated bit period.  This leaves us with the criteria
+that,
+\begin{eqnarray}
+\left|\left(N+2\right)
+	\left(\frac{f_{\mbox{\tiny SYS}}}{f_{\mbox{\tiny BAUD}}}
+		-{\mbox{\tt CKS}}\right)\right| 
+	&<& \frac{f_{\mbox{\tiny SYS}}}{2f_{\mbox{\tiny BAUD}}},
+	\label{eqn:baudlimit}.
+\end{eqnarray}
+where $f_{\mbox{\tiny SYS}}$ is the system clock frequency,
+$f_{\mbox{\tiny BAUD}}$ is the baud rate or frequency,
+{\tt CKS} is the number of clocks per baud as set in the configuration
+register, and $N$ is the number of bits per byte.  What this means is that,
+for transmission rates where $f_{\mbox{\tiny BAUD}}$ approaches
+$f_{\mbox{\tiny SYS}}$, the number of data rates that can actually be
+synthesized becomes limited.
+
+Connecting to either {\tt txuart.v} or {\tt rxuart.v} is quite simple.  Both
+files have a data port and a strobe.  To transmit, set the data and strobe
+lines.  Drop the strobe line as soon as the strobe is asserted and the busy line
+is not.  Likewise, to connect to the {\tt rxuart.v} port, there is a data
+and a strobe.  This time, though, these two wires are outputs of the port as
+opposed to inputs.
+When the strobe is high, the data is valid.  It will only be high for one
+clock period.  If you wish to connect this output to a bus, a register will be
+needed to hold the strobe high until the data is read.  Also, while the strobe
+is high, the {\tt o\_break} line will indicate whether the receiver is in a 
+``break'' state, {\tt o\_frame\_err} will indicate whether or not there was a 
+framing error (i.e., no stop bit), and {\tt o\_parity\_err} will indicate
+wheher or not the parity matched.
+
+The {\tt tx\_busy} line may be inverted and connected to a transmit interrupt
+line.  In a similar fashion, the {\tt rx\_stb} line, or the bus equivalent of
+{\tt rx\_ready}, may be used for receive interrupt lines.
+
+An example of how to put this configuration together is found in
+{\tt wbuart-insert.v}.  In this example given, the {\tt rx\_data} register
+will have only the lower eight bits set if the data is valid, higher bits will
+be set upon error conditions, and cleared automatically upon the next byte read.
+In a similar fashion, the {\tt tx\_data} register can be written to with a byte
+in order to transmit that byte.  Writing bit nine will place the transmitter
+into a ``break'' condition, only cleared by writing a zero to that bit later.
+Reading from the {\tt tx\_data} register can also be used to determine if the
+transmitter is busy (via polling), whether it is currently in a break condition,
+or even what bit is currently being placed to the output port.
+
+The C++ simulation portion of the code revolves around the file
+{\tt bench/cpp/uartsim.cpp} and its associated header.  This file defines a 
+class, {\tt UARTSIM}, which can be used to connect the UART to a TCP/IP stream.
+When initialized, this class takes, as input, the TCP/IP port number that the
+class is to connect with.  Once connected, using this is as simple as
+calculating the receive input bit from the transmit output bit when the
+clock is low, and the core takes care of everything else.
+
+\chapter{Operation}\label{ch:ops}
+
+% This section describes the operation of the core.  Specific sequences, such
+% as startup sequences, as well as the modes and states of the block should be
+% described.
+%
+
+To use the core, a couple of steps are required.  First, wire it up.  The
+{\tt wbuart-insert.v} file should provide a good example of how to wire it up.
+Second, set the UART configuration register.  This is ideally set in an
+initial statement within the code somewhere, but can easily be set elsewhere
+by writing to this register from the bus.
+
+From a simulation standpoint, it will also need to be wired up.  Somewhere, 
+internal to the top--level Verilator C++ simulation file, you'll want to
+have a line similar to,
+\begin{tabbing}
+{\tt if (!clk)} \= \\
+\> {\tt tb->i\_rx} {\tt = } {\tt uartsim(tb->o\_uart, setup);}
+\end{tabbing}
+
+To use the transmitter, set the {\tt i\_stb} and {\tt i\_data} wires.  Drop
+the strobe line any time after {\tt (i\_stb)\&\&(!o\_busy)}.
+
+To use the receiver, grab the data any time {\tt o\_stb} is true.
+
+From the standpoint of the bus, there are two ways to handle receiving and
+transmitting: polling and interrupt based, although both work one character at
+a time.  To poll, repeatedly read the receive data register until only no
+bits but the bottom eight are set.  This is an indication that the byte is
+valid.  Alternatively, you could wait until the an interrupt line is set and
+then read.  In the {\tt wbuart-insert.v} example, the {\tt rx\_int} line will
+be set, and automatically cleared upon any read.  To write, one can read from
+the transmit data register until the eighth bit, the {\tt tx\_busy} bit, is
+cleared, and then transmit.  Alternatively, this negation of this bit may be
+connected to an interrupt line.  Writing to the port while idle will start
+it transmitting.  Writing to the port while it is busy will fill a one word
+buffer that will get sent as soon as the port is idle for one clock.
+
+
+\chapter{Registers}\label{ch:registers}
+% This section specifies all internal registers.  It should completely cover
+% the interface between the CPU and the host as seen from the software point
+% of view.
+
+% List of Registers
+
+% Register 1 Description
+%
+% You shall choose the style of register you prefer.  Do not use both options
+% in one and the same document.  (Table of bits, vs. byetarray type of
+% description).
+
+The core really only has one register associated with it, which is the setup
+register.  The format of this register is important, although not necessarily
+trivial or obvious.  We'll cover two other registers here, though, associated
+with the example wishbone connections from {\tt wbuart-insert.v}.  All three
+of these registers are shown in Tbl.~\ref{tbl:reglist}.
+\begin{table}
+\begin{center}
+\begin{reglist}
+SETUP	& & 30 & R/W & UART configuration/setup register.\\\hline
+RX\_DATA & & 12 & R(/W) & Read data, reads from the UART.\\\hline
+TX\_DATA & & 12 & (R/)W & Transmit data: writes send out the UART.\\\hline
+\end{reglist}\caption{UART Registers}\label{tbl:reglist}
+\end{center}\end{table}
+
+Since the connections presented are only examples, they are listed without
+addresses, as their wishbone bus connectivity will be determined once they 
+are connected.
+
+\section{Setup Register}
+The setup register is perhaps the most critical of all the registers.  This
+is shown in Fig.\ref{fig:SETUP}.
+\begin{figure}\begin{center}
+\begin{bytefield}[endianness=big]{32}
+\bitheader{0-31}\\
+\bitbox{2}{00}
+\bitbox{2}{N}
+\bitbox{1}{S}
+\bitbox{1}{P}
+\bitbox{1}{F}
+\bitbox{1}{T}
+\bitbox{24}{Baud CLKS}
+\end{bytefield}
+\caption{SETUP Register fields}\label{fig:SETUP}
+\end{center}\end{figure}
+It is designed so that, for any 8N1 protocol (eight data bits, no parity, one
+stop bit), only the number of clocks per baud interval needs to be set.  The
+top two bits are unused, making this a 30--bit number.  The other fields
+are: $N$ sets the number of bits per word.  A value of zero corresponds
+to 8--bit words, a value of one to seven bit words, and so forth up to a value
+of three for five bit words.  $S$ determines the number of stop bits.  Set this
+to one for two stop bits, or leave it clear for a single stop bit.  $P$
+determines whether or not a parity bit exists (1 for parity, 0 for none),
+while $F$ determines whether or not the parity is fixed.  Tbl.~\ref{fig:parity}
+lists out the various values possible here.
+\begin{table}\begin{center}
+\begin{tabular}{ccc|l}
+P&F&T&Setting \\\hline\hline
+1 & 0 & 0 & Odd parity		\\\hline
+1 & 0 & 1 & Even parity	\\\hline
+1 & 1 & 0 & Parity bit is a Space (1'b0)\\\hline
+1 & 1 & 1 & Parity bit is a Mark (1'b1)\\\hline
+0 & & & No parity \\\hline
+\end{tabular}\caption{Parity setup}\label{tbl:parity}
+\end{center}\end{table}
+
+\section{RX\_DATA Register}
+Fig.~\ref{fig:RXDATA}
+\begin{figure}\begin{center}
+\begin{bytefield}[endianness=big]{32}
+\bitheader{0-31}\\
+\bitbox{20}{20'h00}
+\bitbox{1}{B}
+\bitbox{1}{F}
+\bitbox{1}{P}
+\bitbox{1}{S}
+\bitbox{8}{RWORD}
+\end{bytefield}
+\caption{RXDATA Register fields}\label{fig:RXDATA}
+\end{center}\end{figure}
+breaks out the various bit fields of the receive
+data register used in the {\tt wbuart-insert.v} example of connecting it to 
+a bus.  In particular, the $B$ field indicates that the receive line is in 
+a break condition.  The $F$ and $P$ fields indicate that a frame error or
+parity error were detected.  These are valid like the data word: when the strobe
+line is set.  The $S$ field will be false when the {\tt RWORD} is valid.
+Hence, if {\tt (RWORD \& ~0x0ff)} is zero there is a word ready to be received
+without error.
+
+\section{TX\_DATA Register}
+Fig.~\ref{fig:TXDATA}
+\begin{figure}\begin{center}
+\begin{bytefield}[endianness=big]{32}
+\bitheader{0-31}\\
+\bitbox{20}{2'h00}
+\bitbox{1}{C}
+\bitbox{1}{O}
+\bitbox{1}{B}
+\bitbox{1}{S}
+\bitbox{8}{TWORD}
+\end{bytefield}
+\caption{TXDATA Register fields}\label{fig:TXDATA}
+\end{center}\end{figure}
+breaks out the various bit fields of the transmit data register used in
+{\tt wbuart-insert.v}.  The $C$ field indicates whether or not the receive
+data line is high or low, the $O$ field indicates the same for the transmit
+line.  These aren't particularly useful or valuable, but they don't fit in the
+receive data register since they would violate the error condition detector.
+They're thrown in here for whatever useful purpose one might find.  The $B$
+field, when set, sends a break condition down the wire.  Writing to the TXDATA
+register, clearing the $B$ field, will clear the transmitter from the break 
+condition without transmitting anything.  The $S$ field is similar to the RXDATA
+strobe register.  It will be true whenever the transmitter is busy or a byte
+is waiting for it.  It will be clear only when the transmitter is idle.
+
+To use the transmitter, simply write a byte to the TXDATA register with the
+upper 24--bits clear to transmit.
+
+\chapter{Clocks}\label{ch:clocks}
+The UART has been tested with a clock as fast as 200~MHz
+(Tbl.~\ref{tbl:clocks}). 
+\begin{table}\begin{center}
+\begin{clocklist}
+{\tt i\_clk} & (System) & 200~MHz & & System clock\\\hline
+\end{clocklist}
+\caption{Clock Requirements}\label{tbl:clocks}
+\end{center}\end{table}
+It should be able to use slower clocks, but only subject to the ability to
+properly set the baud rate as shown in Eqn.~\eqref{eqn:baudlimit} on
+Page~\pageref{eqn:baudlimit}.
+
+I do not recommend using this core with a baud rate greater than a quarter
+of the system clock rate.
+
+% This section specifies all of the clocks.  All clocks, clock domain passes
+% and the clock relations should be described.
+
+% Name | Source |    Rates (MHz)    | Remarks | Description
+%               | Max|Min|Resolution|
+\chapter{Wishbone Datasheet}\label{ch:wishbone}
+
+Tbl.~\ref{tbl:wishbone}
+\begin{table}[htbp]
+\begin{center}
+\begin{wishboneds}
+Revision level of wishbone & WB B4 spec \\\hline
+Type of interface & Slave, Read/Write, pipeline reads supported \\\hline
+Port size & 32--bit \\\hline
+Port granularity & 32--bit \\\hline
+Maximum Operand Size & 32--bit \\\hline
+Data transfer ordering & (Irrelevant) \\\hline
+Clock constraints & None.\\\hline
+Signal Names & \begin{tabular}{ll}
+		Signal Name & Wishbone Equivalent \\\hline
+		{\tt i\_wb\_clk} & {\tt CLK\_I} \\
+		{\tt i\_wb\_cyc} & {\tt CYC\_I} \\
+		{\tt i\_wb\_stb} & {\tt STB\_I} \\
+		{\tt i\_wb\_we} & {\tt WE\_I} \\
+		{\tt i\_wb\_addr} & {\tt ADR\_I} \\
+		{\tt i\_wb\_data} & {\tt DAT\_I} \\
+		{\tt o\_wb\_ack} & {\tt ACK\_O} \\
+		{\tt o\_wb\_stall} & {\tt STALL\_O} \\
+		{\tt o\_wb\_data} & {\tt DAT\_O}
+		\end{tabular}\\\hline
+\end{wishboneds}
+\caption{Wishbone Datasheet}\label{tbl:wishbone}
+\end{center}\end{table}
+is required by the wishbone specification in order to declare the core as
+wishbone compliant, and so it is included here.  It references the connections
+exemplified by {\tt wbuart-insert.v}.  The big thing to notice is that this core
+acts as a wishbone slave, and that all accesses to the core
+registers are 32--bit reads and writes to this interface.
+
+What this table doesn't show is that all accesses to the port take a single
+clock.  That is, if the {\tt i\_wb\_stb} line is high on one clock, the
+{\tt i\_wb\_ack} line will be high the next.  Further, the {\tt o\_wb\_stall}
+line is tied to zero. 
+
+Also, this particular wishbone implementation assumes that if {\tt i\_wb\_stb},
+then {\tt i\_wb\_cyc} will be high as well.  Hence it only checks whether or not
+{\tt i\_wb\_stb} is true to determine if a transaction has taken place.  If your
+bus does not meet this requirement, you'll need to AND {\tt i\_wb\_stb} with
+{\tt i\_wb\_cyc} before using the core.
+
+\chapter{I/O Ports}\label{ch:ioports}
+% This section specifies all of the core IO ports
+
+In it's simplest form, the UART offers simply two I/O ports: the {\tt i\_rx}
+line to receive, and the {\tt o\_tx} line to transmit.  These lines need to be
+brought to the outside of your design.  Within verilator, they need to be
+connected inside your verilator test bench, as in:
+\begin{tabbing}
+{\tt if (!clk)} \= \\
+\> {\tt tb->i\_rx} {\tt = } {\tt uartsim(tb->o\_uart, setup);}
+\end{tabbing}
+
+A more detailed discussion of the connections associated with these modules
+can begin with Tbl.~\ref{tbl:rxports}, detailing the I/O ports of the
+UART receiver, and Tbl.~\ref{tbl:txports},
+\begin{table}\begin{center}\begin{portlist}
+{\tt i\_clk}	& 1 & Input & The system clock \\\hline
+{\tt i\_reset}	& 1 & Input & A positive, synchronous reset \\\hline
+{\tt i\_setup}	& 30 & Input & The 30--bit setup register \\\hline
+{\tt i\_uart}	& 1 & Input & The input wire from the outside world. \\\hline
+{\tt o\_wr}	& 1 & Output & True if a word was received.  At this time,
+		{\tt o\_data}, {\tt o\_break}, {\tt o\_parity\_err}, and
+		{\tt o\_frame\_err} will also be valid. \\\hline
+{\tt o\_data}	& 8 & Output & The received data, valid if {\tt o\_wr} \\\hline
+{\tt o\_break}	& 1 & Output & True in the case of a break condition \\\hline
+{\tt o\_parity\_err}	& 1 & Output & True if a parity error was detected \\\hline
+{\tt o\_frame\_err}	& 1 & Output & True if a frame error was detected \\\hline
+{\tt o\_ck\_uart}	& 1 & Output & A synchronized copy of {\tt i\_uart} \\\hline
+\end{portlist}\caption{RXUART port list}\label{tbl:rxports}
+\end{center}\end{table}
+detailing the I/O ports of the UART transmitter.
+\begin{table}\begin{center}\begin{portlist}
+{\tt i\_clk}	& 1 & Input & The system clock \\\hline
+{\tt i\_reset}	& 1 & Input & A positive, synchronous reset \\\hline
+{\tt i\_setup}	& 30 & Input & The 30--bit setup register \\\hline
+{\tt i\_break}	& 1 & Input & Set to true to place the transmit channel into a break condition\\\hline
+{\tt i\_wr}	& 1 & Input & An input strobe.  Set to one when you wish to transmit data, clear once it has been accepted\\\hline
+{\tt i\_data}	& 8 & Input & The data to be transmitted, ignored unless
+		{\tt (i\_wr)\&\&(!o\_busy)} \\\hline
+{\tt o\_uart}	& 1 & Output & The wire to be connected to the external port\\\hline
+{\tt o\_busy}	& 1 & Output & True if the transmitter is busy, false if it will receive data\\\hline
+\end{portlist}\caption{TXUART port list}\label{tbl:txports}
+\end{center}\end{table}
+
+The ``ports'' associated with the {\tt wbuart-insert.v} example may be
+inferred from the wishbone data sheet.
+
+% Appendices
+% A. May be added to outline different specifications.  (??)
+
+
+% Index
+\end{document}
+
+
