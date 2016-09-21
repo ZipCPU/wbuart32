@@ -1,2 +1,4 @@
 # wbuart32
-A simple UART controller that can easily be wishbone controlled.
+The Universal Asynchronous Serial Transport, or UART, has become quite the common protocol between devices.  It is simple to wire up, easy to use, and easy to process.  This core provides one implementation of the logic necessary to use such a communications scheme.
+
+While you are likely to find many UART examples out there, this particular UART implementation offers something many of these other examples do not: a Verilator simulation capability.  This will allow the user to connect, via a TCP/IP port or a telnet application, to the UART of their desired, verilated simulated, core.  As a result, full two-way interaction can be had betwween a simulation and a terminal or other port.  Indeed, this may even be sufficient to connect a CPU, capable of running Linux, to a terminal to verify that yes it can truly run Linx--all within Verilator.
