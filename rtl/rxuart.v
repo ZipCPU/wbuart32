@@ -2,7 +2,7 @@
 //
 // Filename: 	rxuart.v
 //
-// Project:	FPGA library
+// Project:	wbuart32, a full featured UART with simulator
 //
 // Purpose:	Receive and decode inputs from a single UART line.
 //
