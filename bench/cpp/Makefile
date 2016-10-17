@@ -39,6 +39,8 @@ CXX	:= g++
 FLAGS	:= -Wall -Og -g
 OBJDIR  := obj-pc
 RTLD	:= ../verilog
+VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
+VROOT   := $(VERILATOR_ROOT)
 INCS	:= -I$(RTLD)/obj_dir/ -I/usr/share/verilator/include
 SOURCES := linetest.cpp
 VOBJDR	:= $(RTLD)/obj_dir
