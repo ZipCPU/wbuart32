@@ -1,0 +1,31 @@
+CAPI=1
+[main]
+description = A full featured UART with Simulator
+simulators = verilator
+
+[fileset rtl]
+files =
+  rtl/rxuart.v
+  rtl/txuart.v
+file_type = verilogSource
+
+[verilator]
+verilator_options =
+tb_toplevel = linetest.cpp
+top_module  = linetest
+source_type = CPP
+src_fies = bench/verilog/linetest.v bench/cpp/linetest.cpp bench/cpp/uartsim.h bench/cpp/uartsim.cpp
+
+[fileset tb_files]
+files = bench/verilog/linetest.v
+file_type = verilogSource
+
+[fileset src_files]
+files = linetest.cpp Makefile uartsim.cpp uartsim.h
+file_type = cppSource
+
+[provider]
+name=github
+user=ZipCPU
+repo=wbuart32
+version = master
