@@ -207,6 +207,7 @@ int	main(int argc, char **argv) {
 						lasto = tb.o_uart;
 					}
 
+					/*
 					if (writeout) {
 					fprintf(stderr, "%08lx : [%d -> %d] %02x:%02x (%02x/%d) %d,%d->%02x [%2d/%d/%08x]\n",
 						counts, tb.i_uart, tb.o_uart,
@@ -220,7 +221,7 @@ int	main(int argc, char **argv) {
 						tb.v__DOT__transmitter__DOT__state,
 						tb.v__DOT__transmitter__DOT__zero_baud_counter,
 						tb.v__DOT__transmitter__DOT__baud_counter);
-					}
+					} */
 				}
 
 				if (iterations_before_check-- <= 0) {
