@@ -11,7 +11,7 @@ file_type = verilogSource
 
 [verilator]
 verilator_options =
-tb_toplevel = linetest.cpp
+tb_toplevel = bench/cpp/linetest.cpp
 top_module  = linetest
 source_type = CPP
 src_files = bench/cpp/linetest.cpp bench/cpp/uartsim.cpp
@@ -21,7 +21,5 @@ include_files = bench/cpp/uartsim.h
 files = bench/verilog/linetest.v
 usage = verilator
 file_type = verilogSource
+scope = private
 
-[fileset src_files]
-files = linetest.cpp Makefile uartsim.cpp uartsim.h
-file_type = cppSource
