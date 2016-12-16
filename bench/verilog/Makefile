@@ -46,13 +46,20 @@ FBDIR := .
 VDIRFB:= $(FBDIR)/obj_dir
 RTLDR := ../../rtl
 
-.PHONY: test
-test: $(VDIRFB)/Vlinetest__ALL.a
+.PHONY: test testline testhello
+test: testline testhello
+testline:  $(VDIRFB)/Vlinetest__ALL.a
+testhello: $(VDIRFB)/Vhelloworld__ALL.a
 
 $(VDIRFB)/Vlinetest__ALL.a: $(VDIRFB)/Vlinetest.h $(VDIRFB)/Vlinetest.cpp
 $(VDIRFB)/Vlinetest__ALL.a: $(VDIRFB)/Vlinetest.mk
 $(VDIRFB)/Vlinetest.h $(VDIRFB)/Vlinetest.cpp $(VDIRFB)/Vlinetest.mk: linetest.v
 $(VDIRFB)/Vlinetest.h $(VDIRFB)/Vlinetest.cpp $(VDIRFB)/Vlinetest.mk: $(RTLDR)/rxuart.v $(RTLDR)/txuart.v
+
+$(VDIRFB)/Vhelloworld__ALL.a: $(VDIRFB)/Vhelloworld.h $(VDIRFB)/Vhelloworld.cpp
+$(VDIRFB)/Vhelloworld__ALL.a: $(VDIRFB)/Vhelloworld.mk
+$(VDIRFB)/Vhelloworld.h $(VDIRFB)/Vhelloworld.cpp $(VDIRFB)/Vhelloworld.mk: helloworld.v
+$(VDIRFB)/Vhelloworld.h $(VDIRFB)/Vhelloworld.cpp $(VDIRFB)/Vhelloworld.mk: $(RTLDR)/rxuart.v $(RTLDR)/txuart.v
 
 $(VDIRFB)/V%.cpp $(VDIRFB)/V%.h $(VDIRFB)/V%.mk: $(FBDIR)/%.v
 	verilator -cc -y ../../rtl $*.v 

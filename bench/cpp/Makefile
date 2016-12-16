@@ -42,13 +42,16 @@ RTLD	:= ../verilog
 VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
 VROOT   := $(VERILATOR_ROOT)
 INCS	:= -I$(RTLD)/obj_dir/ -I/usr/share/verilator/include
-SOURCES := linetest.cpp
+SOURCES := helloworld.cpp linetest.cpp uartsim.cpp uartsim.h
 VOBJDR	:= $(RTLD)/obj_dir
 VLIB	:= /usr/share/verilator/include/verilated.cpp
-SIMSRCS := linetest.cpp uartsim.cpp
-SIMOBJ := $(subst .cpp,.o,$(SIMSRCS))
-SIMOBJS:= $(addprefix $(OBJDIR)/,$(SIMOBJ))
-all:	$(OBJDIR)/ linetest
+LINSRCS := linetest.cpp uartsim.cpp
+LINOBJ := $(subst .cpp,.o,$(LINSRCS))
+LINOBJS:= $(addprefix $(OBJDIR)/,$(LINOBJ))
+HLOSRCS := helloworld.cpp uartsim.cpp
+HLOOBJ := $(subst .cpp,.o,$(HLOSRCS))
+HLOOBJS:= $(addprefix $(OBJDIR)/,$(HLOOBJ))
+all:	$(OBJDIR)/ linetest helloworld
 
 $(OBJDIR)/:
 	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR); fi"
@@ -58,11 +61,14 @@ $(OBJDIR)/uartsim.o: uartsim.cpp uartsim.h
 $(OBJDIR)/%.o: %.cpp
 	$(CXX) $(FLAGS) $(INCS) -c $< -o $@
 
-linetest: $(OBJDIR)/linetest.o $(OBJDIR)/uartsim.o $(VOBJDR)/Vlinetest__ALL.a
+linetest: $(LINOBJS) $(VOBJDR)/Vlinetest__ALL.a
+	$(CXX) $(FLAGS) $(INCS) $^ $(VLIB) -o $@
+
+helloworld: $(HLOOBJS) $(VOBJDR)/Vhelloworld__ALL.a
 	$(CXX) $(FLAGS) $(INCS) $^ $(VLIB) -o $@
 
 .PHONY: clean
 clean:
-	rm -f  ./linetest
+	rm -f  ./linetest ./helloworld
 	rm -rf $(OBJDIR)/
 
