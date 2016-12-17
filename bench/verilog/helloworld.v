@@ -49,23 +49,23 @@ module	helloworld(i_clk, i_setup, o_uart);
 	reg	[7:0]	message	[0:15];
 	
 	initial begin
-		message[0] = "H";
-		message[1] = "e";
-		message[2] = "l";
-		message[3] = "l";
-		message[4] = "o";
-		message[5] = ",";
-		message[6] = " ";
-		message[7] = "W";
-		message[8] = "o";
-		message[9] = "r";
+		message[ 0] = "H";
+		message[ 1] = "e";
+		message[ 2] = "l";
+		message[ 3] = "l";
+		message[ 4] = "o";
+		message[ 5] = ",";
+		message[ 6] = " ";
+		message[ 7] = "W";
+		message[ 8] = "o";
+		message[ 9] = "r";
 		message[10] = "l";
 		message[11] = "d";
 		message[12] = "!";
 		message[13] = " ";
 		message[14] = "\r";
 		message[15] = "\n";
-	end;
+	end
 
 	reg	[27:0]	counter;
 	initial	counter = 28'hffffff0;
