@@ -47,22 +47,25 @@ module	helloworld(i_clk, i_setup, o_uart);
 		pwr_reset <= 1'b0;
 
 	reg	[7:0]	message	[0:15];
-	initial	message[0] = "H";
-	initial	message[1] = "e";
-	initial	message[2] = "l";
-	initial	message[3] = "l";
-	initial	message[4] = "o";
-	initial	message[5] = ",";
-	initial	message[6] = " ";
-	initial	message[7] = "W";
-	initial	message[8] = "o";
-	initial	message[9] = "r";
-	initial	message[10] = "l";
-	initial	message[11] = "d";
-	initial	message[12] = "!";
-	initial	message[13] = " ";
-	initial	message[14] = "\r";
-	initial	message[15] = "\n";
+	
+	initial begin
+		message[0] = "H";
+		message[1] = "e";
+		message[2] = "l";
+		message[3] = "l";
+		message[4] = "o";
+		message[5] = ",";
+		message[6] = " ";
+		message[7] = "W";
+		message[8] = "o";
+		message[9] = "r";
+		message[10] = "l";
+		message[11] = "d";
+		message[12] = "!";
+		message[13] = " ";
+		message[14] = "\r";
+		message[15] = "\n";
+	end;
 
 	reg	[27:0]	counter;
 	initial	counter = 28'hffffff0;
