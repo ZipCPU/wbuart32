@@ -4,7 +4,42 @@
 ##
 ## Project:	wbuart32, a full featured UART with simulator
 ##
-## Purpose:	
+## Purpose:	To test a group of Verilator modules: txuart (UART transmitter),
+##		rxuart (UART receiver/sink) and wbuart (UART module, containing
+##	both receiver and transmitter, with FIFOs, controlled via wishbone).
+##
+##
+## Targets:
+##	test
+##		Perform both tests.  The end result should be either a PASS
+##		or a FAIL.
+##
+##	helloworld
+##		A non-automated, and less interactive test than the others.  In
+##		this test, the UART simply produces a Hello World message to the
+##		screen over and over again.
+##
+##	linetest
+##		An automated test of both txuart and rxuart.  The test works
+##		by sending a message through the rxuart, and receiving the
+##		message via the txuart.  This depends upon a Verilog test
+##		infrastructure, linetest.v.
+##
+##		This test may be ran in an interactive mode.  In this mode,
+##		characters written to the UART will be reflected back upon
+##		the entrance of a return character.
+##
+##	speechtest
+##		An automated test of the wbuart, txuart, and fifo.  In this
+##		case, the test RTL produces a copy of the Gettysburg address,
+##		filling the FIFO at 12/16 at a time.  In automated mode, the
+##		speechtest will compare the output against against a text copy
+##		of the speech, and report upon any success or failure.
+##
+##		In interactive mode, the test will repeatedly print out the
+##		Gettysburg address until stopped.  (It may take a significant
+##		amount of time between copies of the Gettysburg address ...)
+##
 ##
 ## Creator:	Dan Gisselquist, Ph.D.
 ##		Gisselquist Technology, LLC
@@ -45,13 +80,19 @@ INCS	:= -I$(RTLD)/obj_dir/ -I/usr/share/verilator/include
 SOURCES := helloworld.cpp linetest.cpp uartsim.cpp uartsim.h
 VOBJDR	:= $(RTLD)/obj_dir
 VLIB	:= /usr/share/verilator/include/verilated.cpp
+# Sources necessary to build the linetest program (rxuart-txuart test)
 LINSRCS := linetest.cpp uartsim.cpp
 LINOBJ := $(subst .cpp,.o,$(LINSRCS))
 LINOBJS:= $(addprefix $(OBJDIR)/,$(LINOBJ))
+# Sources necessary to build the helloworld test (txuart test)
 HLOSRCS := helloworld.cpp uartsim.cpp
 HLOOBJ := $(subst .cpp,.o,$(HLOSRCS))
 HLOOBJS:= $(addprefix $(OBJDIR)/,$(HLOOBJ))
-all:	$(OBJDIR)/ linetest helloworld
+# Sources necessary to build the speech test (wbuart test)
+SPCHSRCS:= speechtest.cpp uartsim.cpp
+SPCHOBJ := $(subst .cpp,.o,$(SPCHSRCS))
+SPCHOBJS:= $(addprefix $(OBJDIR)/,$(SPCHOBJ))
+all:	$(OBJDIR)/ linetest helloworld speechtest test
 
 $(OBJDIR)/:
 	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR); fi"
@@ -67,8 +108,36 @@ linetest: $(LINOBJS) $(VOBJDR)/Vlinetest__ALL.a
 helloworld: $(HLOOBJS) $(VOBJDR)/Vhelloworld__ALL.a
 	$(CXX) $(FLAGS) $(INCS) $^ $(VLIB) -o $@
 
+#
+# The speech test program depends upon a copy of the Gettysburg Address,
+# turned into a hex file format which will be read by the Verilog/RTL
+# $readmemh function.  However, we need to create that hex file that will 
+# written.  That's the purpose of mkspeech--to make a file that can be read
+# by $readmemh.
+#
+mkspeech: mkspeech.cpp
+	$(CXX) mkspeech.cpp -o $@
+
+# Now that mkspeech is available, use it to produce a speech.hex file from
+# the speech.txt file.  Be careful if you adjust this speech: the speechfifo.v
+# verilog file depends upon the exact number of characters--its not a portable
+# dependency, but ... it is what it is.
+speech.hex: mkspeech speech.txt
+	mkspeech speech.txt
+
+# Now, if the speech.hex file is available, then we can perform our final build.
+# Actually, we could've done this without the speech file being available, but
+# this works.
+speechtest: speech.hex $(SPCHOBJS) $(VOBJDR)/Vspeechfifo__ALL.a 
+	$(CXX) $(FLAGS) $(INCS) $(SPCHOBJS) $(VOBJDR)/Vspeechfifo__ALL.a $(VLIB) -o $@
+
+test: linetest speechtest
+	./linetest
+	./speechtest
+
 .PHONY: clean
 clean:
-	rm -f  ./linetest ./helloworld
+	rm -f  ./linetest ./helloworld ./speechtest
+	rm -f ./mkspeech ./speech.hex
 	rm -rf $(OBJDIR)/
 
