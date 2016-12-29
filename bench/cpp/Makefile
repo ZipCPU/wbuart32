@@ -123,7 +123,7 @@ mkspeech: mkspeech.cpp
 # verilog file depends upon the exact number of characters--its not a portable
 # dependency, but ... it is what it is.
 speech.hex: mkspeech speech.txt
-	mkspeech speech.txt
+	./mkspeech speech.txt
 
 # Now, if the speech.hex file is available, then we can perform our final build.
 # Actually, we could've done this without the speech file being available, but
