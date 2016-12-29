@@ -105,6 +105,7 @@
 //
 //
 module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data, o_uart, o_busy);
+	parameter	INITIAL_SETUP = 30'd868;
 	input			i_clk, i_reset;
 	input		[29:0]	i_setup;
 	input			i_break;
@@ -130,6 +131,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data, o_uart, o_busy);
 	reg	[7:0]	lcl_data;
 	reg		calc_parity, r_busy, zero_baud_counter;
 
+	initial	r_setup = INITIAL_SETUP;
 	initial	o_uart = 1'b1;
 	initial	r_busy = 1'b1;
 	initial	state  = `TXU_IDLE;
@@ -231,9 +233,11 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data, o_uart, o_busy);
 	begin
 		zero_baud_counter <= (baud_counter == 28'h01);
 		if ((i_reset)||(i_break))
+		begin
 			// Give ourselves 16 bauds before being ready
 			baud_counter <= break_condition;
-		else if (~zero_baud_counter)
+			zero_baud_counter <= 1'b0;
+		end else if (~zero_baud_counter)
 			baud_counter <= baud_counter - 28'h01;
 		else if (state == `TXU_BREAK)
 			// Give us two stop bits before becoming available

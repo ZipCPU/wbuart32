@@ -113,9 +113,7 @@
 
 module rxuart(i_clk, i_reset, i_setup, i_uart, o_wr, o_data, o_break,
 			o_parity_err, o_frame_err, o_ck_uart);
-	//  parameter // CLOCKS_PER_BAUD = 25'd004340,
-			//  BREAK_CONDITION = CLOCKS_PER_BAUD * 12,
-			//  CLOCKS_PER_HALF_BAUD = CLOCKS_PER_BAUD/2;
+	parameter	INITIAL_SETUP = 30'd868;
 	// 8 data bits, no parity, (at least 1) stop bit
 	input			i_clk, i_reset;
 	input		[29:0]	i_setup;
@@ -131,6 +129,8 @@ module rxuart(i_clk, i_reset, i_setup, i_uart, o_wr, o_data, o_break,
 	wire	[1:0]	data_bits;
 	wire		use_parity, parity_even, dblstop, fixd_parity;
 	reg	[29:0]	r_setup;
+
+	initial	r_setup     = INITIAL_SETUP;
 	assign	clocks_per_baud = { 4'h0, r_setup[23:0] };
 	assign	data_bits   = r_setup[29:28];
 	assign	dblstop     = r_setup[27];
