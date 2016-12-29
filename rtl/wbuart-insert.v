@@ -80,9 +80,9 @@
 		if(((i_wb_stb)&&(~i_wb_we)&&(i_wb_addr == `UART_RX_ADDR))
 				||(rx_stb))
 			r_rx_data[8] <= !rx_stb;
-	assign	o_cts = rx_stb;
+	assign	o_cts = !r_rx_data[8];
 	assign	rx_data = { 20'h00, r_rx_data };
-	assign	rx_int = r_rx_data[8];
+	assign	rx_int = !r_rx_data[8];
 
 	//
 	// Then the UART transmitter
