@@ -146,10 +146,10 @@ int	main(int argc, char **argv) {
 			kill(pid, SIGTERM);
 
 			if ((nr == nw)&&(nw == (int)strlen(string))
-					&&(strcmp(test, string) == 0))
+					&&(strcmp(test, string) == 0)) {
 				printf("PASS!\n");
 				exit(EXIT_SUCCESS);
-			else {
+			} else {
 				printf("TEST FAILED\n");
 				exit(EXIT_FAILURE);
 			}

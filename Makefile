@@ -56,6 +56,7 @@ bench: rtl
 .PHONY: test
 test: bench
 	bench/cpp/linetest
+	# bench/cpp/speechtest bench/cpp/speech.txt
 
 .PHONY: clean
 clean:
