@@ -58,7 +58,7 @@ int	main(int argc, char **argv) {
 	uart = new UARTSIM(port);
 	uart->setup(tb.i_setup);
 
-	while(testcount++ < 0x8000000) {
+	while(testcount++ < 0x7f000000) {
 
 		tb.i_clk = 1;
 		tb.eval();
@@ -67,4 +67,6 @@ int	main(int argc, char **argv) {
 
 		(*uart)(tb.o_uart);
 	}
+
+	printf("\n\nSimulation complete\n");
 }
