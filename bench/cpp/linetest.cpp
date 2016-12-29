@@ -8,7 +8,7 @@
 //		which can be exercised/proven via Verilator.
 //
 //	If you run this program with no arguments, it will run an automatic
-//	test, returning "SUCCESS" on success, or "FAIL" on failure as a last
+//	test, returning "PASS" on success, or "FAIL" on failure as a last
 //	output line--hence it should support automated testing.
 //
 //	If you run with a '-i' argument, the program will run interactively.
@@ -147,9 +147,12 @@ int	main(int argc, char **argv) {
 
 			if ((nr == nw)&&(nw == (int)strlen(string))
 					&&(strcmp(test, string) == 0))
-				printf("SUCCESS!\n");
-			else
+				printf("PASS!\n");
+				exit(EXIT_SUCCESS);
+			else {
 				printf("TEST FAILED\n");
+				exit(EXIT_FAILURE);
+			}
 		} else {
 			close(childs_stdin[ 1]);
 			close(childs_stdout[0]);
