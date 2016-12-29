@@ -8,6 +8,10 @@
 //		buffering one line's worth of input, and then piping that line
 //	to the transmitter while (possibly) receiving a new line.
 //
+//	With some modifications (discussed below), this RTL should be able to
+//	run as a top-level testing file, requiring only the transmit and receive
+//	UART pins and the clock to work.
+//
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
@@ -37,11 +41,34 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-module	linetest(i_clk, i_setup, i_uart, o_uart);
+// Uncomment the next line if you want this program to work as a standalone
+// (not verilated) RTL "program" to test your UART.  You'll also need to set
+// your setup condition properly, though.  I recommend setting it to the 
+// ratio of your onboard clock to your desired baud rate.  For more information
+// about how to set this, please see the specification.
+//
+//`define OPT_STANDALONE
+//
+module	linetest(i_clk,
+`ifndef	OPT_STANDALONE
+			i_setup,
+`endif
+			i_uart, o_uart);
 	input		i_clk;
+`ifndef	OPT_STANDALONE
 	input	[29:0]	i_setup;
+`endif
 	input		i_uart;
 	output	wire	o_uart;
+
+	// If i_setup isnt set up as an input parameter, it needs to be set.
+	// We do so here, to a setting appropriate to create a 115200 Baud
+	// comms system from a 100MHz clock.  This also sets us to an 8-bit
+	// data word, 1-stop bit, and no parity.
+`ifdef	OPT_STANDALONE
+	wire	[29:0]	i_setup;
+	assign		i_setup = 30'd868;	// 115200 Baud, if clk @ 100MHz
+`endif
 
 	reg	[7:0]	buffer	[0:255];
 	reg	[7:0]	head, tail;

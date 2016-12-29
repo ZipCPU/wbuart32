@@ -8,9 +8,13 @@
 //		UART via sending more information than the FIFO can hold,
 //	and then verifying that this was the value received.
 //
-//	To do this, we "borrow" a copy of Lincolns Gettysburg address, make
-//	certain that the FIFO isn't large enough to hold it, and then try
+//	To do this, we "borrow" a copy of Abraham Lincolns Gettysburg address,
+//	make that the FIFO isn't large enough to hold it, and then try
 //	to send this address every couple of minutes.
+//
+//	With some minor modifications (discussed below), this RTL should be
+//	able to be run as a top-level testing file, requiring only that the
+//	clock and the transmit UART pins be working.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -41,10 +45,35 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-module	speechfifo(i_clk, i_setup, o_uart);
+// Uncomment the next line if you want this program to work as a standalone
+// (not verilated) RTL "program" to test your UART.  You'll also need to set
+// your i_setup condition properly, though (below).  I recommend setting it to 
+// the ratio of your onboard clock to your desired baud rate.  For more
+// information about how to set this, please see the specification.
+//
+//`define OPT_STANDALONE
+//
+module	speechfifo(i_clk,
+`ifndef	OPT_STANDALONE
+			i_setup,
+`endif
+			o_uart);
 	input		i_clk;
-	input	[29:0]	i_setup;
 	output	wire	o_uart;
+
+	// The i_setup wires are input when run under Verilator, but need to
+	// be set internally if this is going to run as a standalone top level
+	// test configuration.
+`ifdef	OPT_STANDALONE
+	wire	[29:0]	i_setup;
+
+	// Here we set i_setup to something appropriate to create a 115200 Baud
+	// UART system from a 100MHz clock.  This also sets us to an 8-bit data
+	// word, 1-stop bit, and no parity.
+	assign	i_setup = 30'd868;
+`else
+	input	[29:0]	i_setup;
+`endif
 
 	reg		wb_stb;
 	reg	[1:0]	wb_addr;

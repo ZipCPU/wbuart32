@@ -7,6 +7,10 @@
 // Purpose:	To create a *very* simple UART test program, which can be used
 //		as the top level design file of any FPGA program.
 //
+//	With some modifications (discussed below), this RTL should be able to
+//	run as a top-level testing file, requiring only the UART and clock pin
+//	to work.
+//
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
@@ -36,10 +40,34 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-module	helloworld(i_clk, i_setup, o_uart);
+// Uncomment the next line if you want this program to work as a standalone
+// (not verilated) RTL "program" to test your UART.  You'll also need to set
+// your setup condition properly, though.  I recommend setting it to the 
+// ratio of your onboard clock to your desired baud rate.  For more information
+// about how to set this, please see the specification.
+//
+//`define OPT_STANDALONE
+//
+module	helloworld(i_clk,
+`ifndef	OPT_STANDALONE
+			i_setup,
+`endif
+			o_uart);
+	//
 	input		i_clk;
+`ifndef	OPT_STANDALONE
 	input	[29:0]	i_setup;
+`endif
 	output	wire	o_uart;
+
+	// If i_setup isnt set up as an input parameter, it needs to be set.
+	// We do so here, to a setting appropriate to create a 115200 Baud
+	// comms system from a 100MHz clock.  This also sets us to an 8-bit
+	// data word, 1-stop bit, and no parity.
+`ifdef	OPT_STANDALONE
+	wire	[29:0]	i_setup;
+	assign		i_setup = 30'd868;	// 115200 Baud, if clk @ 100MHz
+`endif
 
 	reg	pwr_reset;
 	initial	pwr_reset = 1'b1;
