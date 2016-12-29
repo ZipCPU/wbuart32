@@ -48,6 +48,7 @@ VDIRFB:= $(FBDIR)/obj_dir
 .PHONY: test
 test: $(VDIRFB)/Vtxuart__ALL.a
 test: $(VDIRFB)/Vrxuart__ALL.a
+test: $(VDIRFB)/Vwbuart__ALL.a
 
 $(VDIRFB)/Vrxuart__ALL.a: $(VDIRFB)/Vrxuart.h $(VDIRFB)/Vrxuart.cpp
 $(VDIRFB)/Vrxuart__ALL.a: $(VDIRFB)/Vrxuart.mk
@@ -56,6 +57,10 @@ $(VDIRFB)/Vrxuart.h $(VDIRFB)/Vrxuart.cpp $(VDIRFB)/Vrxuart.mk: rxuart.v
 $(VDIRFB)/Vtxuart__ALL.a: $(VDIRFB)/Vtxuart.h $(VDIRFB)/Vtxuart.cpp
 $(VDIRFB)/Vtxuart__ALL.a: $(VDIRFB)/Vtxuart.mk
 $(VDIRFB)/Vtxuart.h $(VDIRFB)/Vtxuart.cpp $(VDIRFB)/Vtxuart.mk: txuart.v
+
+$(VDIRFB)/Vwbuart__ALL.a: $(VDIRFB)/Vwbuart.h $(VDIRFB)/Vwbuart.cpp
+$(VDIRFB)/Vwbuart__ALL.a: $(VDIRFB)/Vwbuart.mk
+$(VDIRFB)/Vwbuart.h $(VDIRFB)/Vwbuart.cpp $(VDIRFB)/Vwbuart.mk: wbuart.v
 
 $(VDIRFB)/V%.cpp $(VDIRFB)/V%.h $(VDIRFB)/V%.mk: $(FBDIR)/%.v
 	verilator -cc $*.v 
