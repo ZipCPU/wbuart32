@@ -73,11 +73,18 @@ module	wbuart(i_clk, i_rst,
 	// The UART setup parameters: bits per byte, stop bits, parity, and
 	// baud rate are all captured within this uart_setup register.
 	//
+	// We'll also add the capability here whereby writes to this register
+	// work to reset the entire interface--clearing the FIFO's and ending
+	// any transmission in progress.
+	//
 	reg	uart_reset;
 	reg	[29:0]	uart_setup;
 	initial	uart_setup = UART_SETUP;
 	initial	uart_reset = 1'b1;
 	always @(posedge i_clk)
+		// Under wishbone rules, a write takes place any time i_wb_stb
+		// is high.  If that's the case, and if the write was to the
+		// setup address, then set us up for the new parameters.
 		if ((i_wb_stb)&&(i_wb_addr == `UART_SETUP))
 		begin
 			uart_setup[29:0] <= i_wb_data[29:0];
@@ -90,45 +97,95 @@ module	wbuart(i_clk, i_rst,
 	//
 	// First the UART receiver
 	//
+
+	// First the wires/registers this receiver depends upon
 	wire		rx_stb, rx_break, rx_perr, rx_ferr, ck_uart;
 	wire	[7:0]	rx_uart_data;
 	reg		rx_uart_reset;
+
+	// Here's our UART receiver.  Basically, it accepts our setup wires, 
+	// the UART input, a clock, and a reset line, and produces outputs:
+	// a stb (true when new data is ready), an 8-bit data out value
+	// valid when stb is high, a break value (true during a break cond.),
+	// and parity/framing error flags--also valid when stb is true.
 	rxuart	#(UART_SETUP) rx(i_clk, (i_rst)||(rx_uart_reset),
 			uart_setup, i_uart_rx,
 			rx_stb, rx_uart_data, rx_break,
 			rx_perr, rx_ferr, ck_uart);
+	// The real trick is ... now that we have this data, what do we do
+	// with it?
 
+
+	// We place it into a receiver FIFO.
+	//
+	// Here's the declarations for the wires it needs.
 	wire		rx_empty_n, rx_fifo_err;
 	wire	[7:0]	rxf_wb_data;
 	wire	[15:0]	rxf_status;
 	reg		rxf_wb_read;
-	// which leads right into it's attached FIFO
+	//
+	// And here's the FIFO proper.
+	//
+	// Note that the FIFO will be cleared upon any reset: either if there's
+	// a UART break condition on the line, the receiver is in reset, or an
+	// external reset is issued.
+	//
+	// The FIFO accepts strobe and data from the receiver.
+	// We issue another wire to it (rxf_wb_read), true when we wish to read
+	// from the FIFO, and we get our data in rxf_wb_data.  The FIFO outputs
+	// four status-type values: 1) is it non-empty, 2) is the FIFO over half
+	// full, 3) a 16-bit status register, containing info regarding how full
+	// the FIFO truly is, and 4) an error indicator.
 	ufifo	#(.LGFLEN(LGFLEN))
 		rxfifo(i_clk, (i_rst)||(rx_break)||(rx_uart_reset),
 			rx_stb, rx_uart_data,
 			rxf_wb_read, rxf_wb_data,
 			(rx_empty_n), (o_uart_rxfifo_int),
 			rxf_status, rx_fifo_err);
+
+	// We produce four interrupts.  One of the receive interrupts indicates
+	// whether or not the receive FIFO is non-empty.  This should wake up
+	// the CPU.
 	assign	o_uart_rx_int = !rx_empty_n;
 
+	// If the bus requests that we read from the receive FIFO, we need to
+	// tell this to the receive FIFO.  Note that because we are using a 
+	// clock here, the output from the receive FIFO will necessarily be
+	// delayed by an extra clock.
 	initial	rxf_wb_read = 1'b0;
 	always @(posedge i_clk)
-		rxf_wb_read <= (i_wb_stb)&&(i_wb_addr[1:0]==`UART_RXREG)&&(!i_wb_we);
+		rxf_wb_read <= (i_wb_stb)&&(i_wb_addr[1:0]==`UART_RXREG)
+				&&(!i_wb_we);
 
+	// Now, let's deal with those RX UART errors: both the parity and frame
+	// errors.  As you may recall, these are valid only when rx_stb is
+	// valid, so we need to hold on to them until the user reads them via
+	// a UART read request..
 	reg	r_rx_perr, r_rx_ferr;
 	initial	r_rx_perr = 1'b0;
 	initial	r_rx_ferr = 1'b0;
 	always @(posedge i_clk)
 		if ((rx_uart_reset)||(rx_break))
 		begin
+			// Clear the error
 			r_rx_perr <= 1'b0;
 			r_rx_ferr <= 1'b0;
-		end else if ((i_wb_stb)&&(i_wb_addr[1:0]==`UART_RXREG)&&(i_wb_we))
+		end else if ((i_wb_stb)
+				&&(i_wb_addr[1:0]==`UART_RXREG)&&(i_wb_we))
 		begin
+			// Reset the error lines if a '1' is ever written to
+			// them, otherwise leave them alone.
+			//
 			r_rx_perr <= (r_rx_perr)&&(~i_wb_data[9]);
 			r_rx_ferr <= (r_rx_ferr)&&(~i_wb_data[10]);
 		end else if (rx_stb)
 		begin
+			// On an rx_stb, capture any parity or framing error
+			// indications.  These aren't kept with the data rcvd,
+			// but rather kept external to the FIFO.  As a result,
+			// if you get a parity or framing error, you will never
+			// know which data byte it was associated with.
+			// For now ... that'll work.
 			r_rx_perr <= (r_rx_perr)||(rx_perr);
 			r_rx_ferr <= (r_rx_ferr)||(rx_ferr);
 		end
@@ -136,12 +193,21 @@ module	wbuart(i_clk, i_rst,
 	initial	rx_uart_reset = 1'b1;
 	always @(posedge i_clk)
 		if (uart_reset)
+			// The receiver reset, always set on a master reset
+			// request.
 			rx_uart_reset <= 1'b1;
 		else if ((i_wb_stb)&&(i_wb_addr[1:0]==`UART_RXREG)&&(i_wb_we))
+			// Writes to the receive register will command a receive
+			// reset anytime bit[12] is set.
 			rx_uart_reset <= i_wb_data[12];
 		else
 			rx_uart_reset <= 1'b0;
 
+	// Finally, we'll construct a 32-bit value from these various wires,
+	// to be returned over the bus on any read.  These include the data
+	// that would be read from the FIFO, an error indicator set upon
+	// reading from an empty FIFO, a break indicator, and the frame and
+	// parity error signals.
 	wire	[31:0]	wb_rx_data;
 	assign	wb_rx_data = { 16'h00,
 				3'h0, rx_fifo_err,
@@ -157,21 +223,52 @@ module	wbuart(i_clk, i_rst,
 	reg		r_tx_break, txf_wb_write;
 	reg	[7:0]	txf_wb_data;
 
+	// Unlike the receiver which goes from RXUART -> UFIFO -> WB, the
+	// transmitter basically goes WB -> UFIFO -> TXUART.  Hence, to build
+	// support for the transmitter, we start with the command to write data
+	// into the FIFO.  In this case, we use the act of writing to the 
+	// UART_TXREG address as our indication that we wish to write to the 
+	// FIFO.  Here, we create a write command line, and latch the data for
+	// the extra clock that it'll take so that the command and data can be
+	// both true on the same clock.
 	initial	txf_wb_write = 1'b0;
 	always @(posedge i_clk)
 	begin
-		txf_wb_write <= (i_wb_stb)&&(i_wb_addr == `UART_TXREG)&&(i_wb_we);
+		txf_wb_write <= (i_wb_stb)&&(i_wb_addr == `UART_TXREG)
+					&&(i_wb_we);
 		txf_wb_data  <= i_wb_data[7:0];
 	end
 
+	// Transmit FIFO
+	//
+	// Most of this is just wire management.  The TX FIFO is identical in
+	// implementation to the RX FIFO (theyre both UFIFOs), but the TX
+	// FIFO is fed from the WB and read by the transmitter.  Some key
+	// differences to note: we reset the transmitter on any request for a
+	// break.  We read from the FIFO any time the UART transmitter is idle.
+	// and ... we just set the values (above) for controlling writing into
+	// this.
 	ufifo	#(.LGFLEN(LGFLEN))
 		txfifo(i_clk, (i_rst)||(r_tx_break)||(tx_uart_reset),
 			txf_wb_write, txf_wb_data,
 				(~tx_busy)&&(tx_empty_n), tx_data,
 			tx_empty_n, txf_half_full, txf_status, txf_err);
-	assign	o_uart_tx_int = tx_empty_n;
+	// Let's grab two interrupts from the FIFO for the CPU.
+	//	The first will be true any time the FIFO is empty.
+	assign	o_uart_tx_int = !tx_empty_n;
+	//	The second will be true any time the FIFO is less than half
+	//	full, allowing us a change to always keep it (near) fully 
+	//	charged.
 	assign	o_uart_txfifo_int = !txf_half_full;
 
+	// Break logic
+	//
+	// A break in a UART controller is any time the UART holds the line
+	// low for an extended period of time.  Here, we capture the wb_data[9]
+	// wire, on writes, as an indication we wish to break.  As long as you
+	// write unsigned characters to the interface, this will never be true
+	// unless you wish it to be true.  Be aware, though, writing a valid
+	// value to the interface will bring it out of the break condition.
 	initial	r_tx_break = 1'b0;
 	always @(posedge i_clk)
 		if (i_rst)
@@ -179,6 +276,12 @@ module	wbuart(i_clk, i_rst,
 		else if ((i_wb_stb)&&(i_wb_addr[1:0]==`UART_TXREG)&&(i_wb_we))
 			r_tx_break <= i_wb_data[9];
 
+	// TX-Reset logic
+	//
+	// This is nearly identical to the RX reset logic above.  Basically,
+	// any time someone writes to bit [12] the transmitter will go through
+	// a reset cycle.  Keep bit [12] low, and everything will proceed as
+	// normal.
 	initial	tx_uart_reset = 1'b1;
 	always @(posedge i_clk)
 		if (uart_reset)
@@ -188,28 +291,75 @@ module	wbuart(i_clk, i_rst,
 		else
 			tx_uart_reset <= 1'b0;
 
+	// Finally, the UART transmitter module itself.  Note that we haven't
+	// connected the reset wire.  Transmitting is as simple as setting
+	// the stb value (here set to tx_empty_n) and the data.  When these
+	// are both set on the same clock that tx_busy is low, the transmitter
+	// will move on to the next data byte.  Really, the only thing magical
+	// here is that tx_empty_n wire--thus, if there's anything in the FIFO,
+	// we read it here.  (You might notice above, we register a read any
+	// time (tx_empty_n) and (!tx_busy) are both true---the condition for
+	// starting to transmit a new byte.)
 	wire	tx_busy;
 	txuart	#(UART_SETUP) tx(i_clk, 1'b0, uart_setup,
 			r_tx_break, (tx_empty_n), tx_data,
 			o_uart_tx, tx_busy);
 
+	// Now that we are done with the chain, pick some wires for the user
+	// to read on any read of the transmit port.
+	//
+	// This port is different from reading from the receive port, since
+	// there are no side effects.  (Reading from the receive port advances
+	// the receive FIFO, here only writing to the transmit port advances the
+	// transmit FIFO--hence the read values are free for ... whatever.)  
+	// We choose here to provide information about the transmit FIFO
+	// (txf_err, txf_half_full, tx_empty_n), information about the current
+	// voltage on the line (o_uart_tx)--and even the voltage on the receive
+	// line (ck_uart), as well as our current setting of the break and
+	// whether or not we are actively transmitting.
 	wire	[31:0]	wb_tx_data;
 	assign	wb_tx_data = { 16'h00, 
 				1'h0, txf_err, txf_half_full, tx_empty_n,
 				ck_uart, o_uart_tx, r_tx_break, tx_busy,
 				txf_wb_data};
 
+	// Each of the FIFO's returns a 16 bit status value.  This value tells
+	// us both how big the FIFO is, as well as how much of the FIFO is in 
+	// use.  Let's merge those two status words together into a word we
+	// can use when reading about the FIFO.
 	wire	[31:0]	wb_fifo_data;
 	assign	wb_fifo_data = { txf_status, rxf_status };
 
+	// You may recall from above that reads take two clocks.  Hence, we
+	// need to delay the address decoding for a clock until the data is 
+	// ready.  We do that here.
+	reg	[1:0]	r_wb_addr;
 	always @(posedge i_clk)
-		casez(i_wb_addr)
+		r_wb_addr <= i_wb_addr;
+
+	// Likewise, the acknowledgement is delayed by one clock.
+	reg	r_wb_ack;
+	always @(posedge i_clk) // We'll ACK in two clocks
+		r_wb_ack <= i_wb_stb;
+	always @(posedge i_clk) // Okay, time to set the ACK
+		o_wb_ack <= r_wb_ack;
+
+	// Finally, set the return data.  This data must be valid on the same
+	// clock o_wb_ack is high.  On all other clocks, it is irrelelant--since
+	// no one cares, no one is reading it, it gets lost in the mux in the
+	// interconnect, etc.  For this reason, we can just simplify our logic.
+	always @(posedge i_clk)
+		casez(r_wb_addr)
 		`UART_SETUP: o_wb_data <= { 2'b00, uart_setup };
 		`UART_FIFO:  o_wb_data <= wb_fifo_data;
 		`UART_RXREG: o_wb_data <= wb_rx_data;
 		`UART_TXREG: o_wb_data <= wb_tx_data;
 		endcase
 
+	// This device never stalls.  Sure, it takes two clocks, but they are
+	// pipelined, and nothing stalls that pipeline.  (Creates FIFO errors,
+	// perhaps, but doesn't stall the pipeline.)  Hence, we can just
+	// set this value to zero.
 	assign	o_wb_stall = 1'b0;
 
 endmodule
