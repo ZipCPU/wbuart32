@@ -79,7 +79,8 @@ VROOT   := $(VERILATOR_ROOT)
 INCS	:= -I$(RTLD)/obj_dir/ -I/usr/share/verilator/include
 SOURCES := helloworld.cpp linetest.cpp uartsim.cpp uartsim.h
 VOBJDR	:= $(RTLD)/obj_dir
-VLIB	:= /usr/share/verilator/include/verilated.cpp
+SYSVDR	:= /usr/share/verilator/include
+VLIB	:= $(SYSVDR)/verilated.cpp $(SYSVDR)/verilated_vcd_c.cpp
 # Sources necessary to build the linetest program (rxuart-txuart test)
 LINSRCS := linetest.cpp uartsim.cpp
 LINOBJ := $(subst .cpp,.o,$(LINSRCS))

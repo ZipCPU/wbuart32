@@ -52,6 +52,7 @@
 #include "verilated.h"
 #include "Vspeechfifo.h"
 #include "uartsim.h"
+#include "verilated_vcd_c.h"
 
 void	usage(void) {
 	fprintf(stderr, "USAGE: speechtest [-i] [<matchfile>.txt]\n");
@@ -106,11 +107,18 @@ int	main(int argc, char **argv) {
 		uart = new UARTSIM(port);
 		uart->setup(tb.i_setup);
 
-		while(testcount++ < 0x7f000000) {
+		Verilated::traceEverOn(true);
+		VerilatedVcdC* tfp = new VerilatedVcdC;
+		tb.trace(tfp, 99);
+		tfp->open("speechtrace.vcd");
+
+		testcount = 0;
+		while(testcount < 0x080000) {
 			// Run one tick of the clock.
 
 			tb.i_clk = 1;	// Positive edge
 			tb.eval();
+			tfp->dump(5*(2*testcount));
 			tb.i_clk = 0;	// Negative edge
 			tb.eval();
 
@@ -118,9 +126,15 @@ int	main(int argc, char **argv) {
 			// value since the SpeechTest doesnt use it.
 			(*uart)(tb.o_uart);
 
+			tfp->dump(5*(2*testcount+1));
+			testcount++;
+
+// #define	DEBUG
 #ifdef	DEBUG
 		//
 		// Here are my notes from my last attempt at debug by printf.
+		printf("%08x ", 
+			tb.v__DOT__restart_counter);
 		printf("%s %s@%d<-%08x[%c/%4d] (%s%s,%08x,%2d,%2d,%2d,%c,%s) %s,%02x >%d\n",
 			(tb.v__DOT__restart)?"RST":"   ",
 			(tb.v__DOT__wb_stb)?"STB":"   ",
@@ -143,6 +157,8 @@ int	main(int argc, char **argv) {
 			(tb.o_uart));
 #endif
 		}
+
+		tfp->close();
 
 		//
 		// *IF* we ever get here, then at least explain to the user

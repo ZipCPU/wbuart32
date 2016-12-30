@@ -98,7 +98,7 @@ $(VDIRFB)/Vspeechfifo__ALL.a: $(VDIRFB)/Vspeechfifo.mk
 $(SPEECHVFILES): speechfifo.v $(SPEECHSRCS)
 
 $(VDIRFB)/V%.cpp $(VDIRFB)/V%.h $(VDIRFB)/V%.mk: $(FBDIR)/%.v
-	verilator -cc -y ../../rtl $*.v 
+	verilator --trace -cc -y ../../rtl $*.v 
 
 $(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.mk
 	cd $(VDIRFB); make -f V$*.mk

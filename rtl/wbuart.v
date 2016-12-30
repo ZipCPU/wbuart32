@@ -73,26 +73,14 @@ module	wbuart(i_clk, i_rst,
 	// The UART setup parameters: bits per byte, stop bits, parity, and
 	// baud rate are all captured within this uart_setup register.
 	//
-	// We'll also add the capability here whereby writes to this register
-	// work to reset the entire interface--clearing the FIFO's and ending
-	// any transmission in progress.
-	//
-	reg	uart_reset;
 	reg	[29:0]	uart_setup;
 	initial	uart_setup = UART_SETUP;
-	initial	uart_reset = 1'b1;
 	always @(posedge i_clk)
 		// Under wishbone rules, a write takes place any time i_wb_stb
 		// is high.  If that's the case, and if the write was to the
 		// setup address, then set us up for the new parameters.
-		if ((i_wb_stb)&&(i_wb_addr == `UART_SETUP))
-		begin
+		if ((i_wb_stb)&&(i_wb_addr == `UART_SETUP)&&(i_wb_we))
 			uart_setup[29:0] <= i_wb_data[29:0];
-			uart_reset <= 1'b1;
-		end else
-			uart_reset <= 1'b0;
-
-	reg	tx_uart_reset;
 
 	//
 	// First the UART receiver
@@ -192,7 +180,7 @@ module	wbuart(i_clk, i_rst,
 
 	initial	rx_uart_reset = 1'b1;
 	always @(posedge i_clk)
-		if (uart_reset)
+		if ((i_rst)||((i_wb_stb)&&(i_wb_addr[1:0]==`UART_SETUP)&&(i_wb_we)))
 			// The receiver reset, always set on a master reset
 			// request.
 			rx_uart_reset <= 1'b1;
@@ -220,7 +208,7 @@ module	wbuart(i_clk, i_rst,
 	wire		tx_empty_n, txf_half_full, txf_err;
 	wire	[7:0]	tx_data;
 	wire	[15:0]	txf_status;
-	reg		r_tx_break, txf_wb_write;
+	reg		r_tx_break, txf_wb_write, tx_uart_reset;
 	reg	[7:0]	txf_wb_data;
 
 	// Unlike the receiver which goes from RXUART -> UFIFO -> WB, the
@@ -249,7 +237,7 @@ module	wbuart(i_clk, i_rst,
 	// and ... we just set the values (above) for controlling writing into
 	// this.
 	ufifo	#(.LGFLEN(LGFLEN))
-		txfifo(i_clk, (i_rst)||(r_tx_break)||(tx_uart_reset),
+		txfifo(i_clk, (r_tx_break)||(tx_uart_reset),
 			txf_wb_write, txf_wb_data,
 				(~tx_busy)&&(tx_empty_n), tx_data,
 			tx_empty_n, txf_half_full, txf_status, txf_err);
@@ -284,7 +272,7 @@ module	wbuart(i_clk, i_rst,
 	// normal.
 	initial	tx_uart_reset = 1'b1;
 	always @(posedge i_clk)
-		if (uart_reset)
+		if((i_rst)||((i_wb_stb)&&(i_wb_addr == `UART_SETUP)&&(i_wb_we)))
 			tx_uart_reset <= 1'b1;
 		else if ((i_wb_stb)&&(i_wb_addr[1:0]==`UART_TXREG)&&(i_wb_we))
 			tx_uart_reset <= i_wb_data[12];

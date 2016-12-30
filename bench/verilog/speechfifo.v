@@ -113,22 +113,19 @@ module	speechfifo(i_clk,
 	// Since we want to start our message just a couple clocks after power
 	// up, we'll set the reset counter just a couple clocks shy of a roll
 	// over.
-	initial	restart_counter = -31'hd16;
+	initial	restart_counter = -31'd16;
 	always @(posedge i_clk)
 		restart_counter <= restart_counter+1'b1;
 
 	// Ok, now that we have a counter that tells us when to start over,
 	// let's build a set of signals that we can use to get things started
-	// again.  The first signal will be restart[0], set to 1 on the clock
-	// after restart_counter == 0.  This '1' value will then flow through
-	// restart[1] and then restart[2] before vanishing and then waiting
-	// for the counter to overflow again.
-	reg	[2:0]	restart;
-	initial	restart = 3'b0;
+	// again.  This will be the restart signal.  On this signal, we just
+	// restart everything.
+	reg	restart;
+	initial	restart = 0;
 	always @(posedge i_clk)
 	begin
-		restart[2:1] <= restart[1:0];
-		restart[0] <= (restart_counter == 0);
+		restart <= (restart_counter == 0);
 	end
 
 	// Our message index.  This is the address of the character we wish to
@@ -139,9 +136,9 @@ module	speechfifo(i_clk,
 	initial	msg_index = 11'd2040;
 	always @(posedge i_clk)
 	begin
-		if (restart[0])
+		if (restart)
 			msg_index <= 0;
-		else if ((wb_stb)&&(!uart_stall)&&(restart[0]==1'b0))
+		else if ((wb_stb)&&(!uart_stall))
 			// We only advance the index if a port operation on the
 			// wbuart has taken place.  That's what the
 			// (wb_stb)&&(!uart_stall) is about.  (wb_stb) is the
@@ -158,7 +155,7 @@ module	speechfifo(i_clk,
 
 	// What data will we be sending to the port?
 	always @(posedge i_clk)
-		if (restart[0])
+		if (restart)
 			// The first thing we do is set the baud rate, and
 			// serial port configuration parameters.  Ideally,
 			// we'd only set this once.  But rather than complicate
@@ -173,7 +170,7 @@ module	speechfifo(i_clk,
 	// values we send to the transmitters address.  We should really be
 	// double checking that stall remains low, but its not required here.
 	always @(posedge i_clk)
-		if (restart[0])
+		if (restart)
 			wb_addr <= 2'b00;
 		else // if (!uart_stall)??
 			wb_addr <= 2'b11;
@@ -186,11 +183,7 @@ module	speechfifo(i_clk,
 	// again.
 	initial	wb_stb = 1'b0;
 	always @(posedge i_clk)
-		if (restart[0])
-			wb_stb <= 1'b1;
-		else if (restart[1])
-			wb_stb <= 1'b0;
-		else if (restart[2])
+		if (restart)
 			wb_stb <= 1'b1;
 		else if (msg_index >= 1497)
 			wb_stb <= 1'b0;
