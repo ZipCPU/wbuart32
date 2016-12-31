@@ -73,7 +73,7 @@ int	main(int argc, char **argv) {
 	Vspeechfifo	tb;
 	UARTSIM		*uart;
 	int		port = 0;
-	unsigned	setup = 25, testcount = 0;
+	unsigned	setup = 25, testcount = 0, baudclocks;
 	const char	*matchfile = "speech.txt";
 	bool		run_interactively = false;
 
@@ -92,6 +92,7 @@ int	main(int argc, char **argv) {
 	}
 
 	tb.i_setup = setup;
+	baudclocks = setup & 0x0ffffff;
 
 	if (run_interactively) {
 		//
@@ -102,7 +103,8 @@ int	main(int argc, char **argv) {
 		//
 		// The cool part of the interactive mode is that we can
 		// output internals from the simulation, for the purpose of
-		// debug by printf.
+		// debug by printf.  We can also dump things to a VCD file,
+		// should you wish to run GTKwave.
 		//
 		uart = new UARTSIM(port);
 		uart->setup(tb.i_setup);
@@ -113,7 +115,7 @@ int	main(int argc, char **argv) {
 		tfp->open("speechtrace.vcd");
 
 		testcount = 0;
-		while(testcount < 0x080000) {
+		while(testcount < baudclocks * 16 * 2048) {
 			// Run one tick of the clock.
 
 			tb.i_clk = 1;	// Positive edge
@@ -365,6 +367,7 @@ int	main(int argc, char **argv) {
 			//
 			// Now ... we're finally ready to run our simulation.
 			//
+			// while(testcount < baudclocks * 16 * 2048)
 			while(testcount++ < 0x7f000000) {
 				// Rising edge of the clock
 				tb.i_clk = 1;
@@ -378,7 +381,7 @@ int	main(int argc, char **argv) {
 				(*uart)(tb.o_uart);
 			}
 
-			// We will never get here.  If all goes well, well be
+			// We will never get here.  If all goes well, we will be
 			// killed as soon as we produce the speech.txt file
 			// output--many clocks before this.
 	
