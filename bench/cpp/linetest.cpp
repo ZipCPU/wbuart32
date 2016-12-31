@@ -50,9 +50,11 @@
 #include <string.h>
 #include <time.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <signal.h>
 #include "verilated.h"
 #include "Vlinetest.h"
+#include "verilated_vcd_c.h"
 #include "uartsim.h"
 
 int	main(int argc, char **argv) {
@@ -62,6 +64,7 @@ int	main(int argc, char **argv) {
 	bool		run_interactively = false;
 	int		port = 0;
 	unsigned	setup = 25;
+	char string[] = "This is a UART testing string\r\n";
 
 	for(int argn=1; argn<argc; argn++) {
 		if (argv[argn][0] == '-') for(int j=1; (j<1000)&&(argv[argn][j]); j++)
@@ -83,6 +86,7 @@ int	main(int argc, char **argv) {
 	}
 
 	tb.i_setup = setup;
+	int baudclocks = setup & 0x0ffffff;
 	tb.i_uart = 1;
 	if (run_interactively) {
 		uart = new UARTSIM(port);
@@ -108,23 +112,22 @@ int	main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 
-		pid_t pid = fork();
+		pid_t childs_pid = fork();
 
-		if (pid < 0) {
+		if (childs_pid < 0) {
 			fprintf(stderr, "ERR setting up child process\n");
 			perror("O/S ERR");
 			printf("TEST FAILURE\n");
 			exit(EXIT_FAILURE);
 		}
 
-		if (pid) {
+		if (childs_pid) {
 			int	nr=-2, nw;
 
 			// We are the parent
 			close(childs_stdin[ 0]); // Close the read end
 			close(childs_stdout[1]); // Close the write end
 
-			char string[] = "This is a UART testing string\r\n";
 			char test[256];
 
 			nw = write(childs_stdin[1], string, strlen(string));
@@ -142,8 +145,28 @@ int	main(int argc, char **argv) {
 				printf("Successfully read %d characters: %s\n", nr, test);
 			}
 
-			// We are done, kill our child if not already dead
-			kill(pid, SIGTERM);
+			int	status = 0, rv = -1;
+
+			// Give the child the oppoortunity to take another
+			// 60 seconds to finish closing itself
+			for(int waitcount=0; waitcount < 60; waitcount++) {
+				rv = waitpid(-1, &status, WNOHANG);
+				if (rv == childs_pid)
+					break;
+				else if (rv < 0)
+					break;
+				else // rv == 0
+					sleep(1);
+			}
+
+			if (rv != childs_pid) {
+				kill(childs_pid, SIGTERM);
+				printf("WARNING: Child/simulator did not terminate normally\n");
+			}
+
+			if (WEXITSTATUS(status) != EXIT_SUCCESS) {
+				printf("WARNING: Child/simulator exit status does not indicate success\n");
+			}
 
 			if ((nr == nw)&&(nw == (int)strlen(string))
 					&&(strcmp(test, string) == 0)) {
@@ -176,9 +199,25 @@ int	main(int argc, char **argv) {
 			// Make sure we don't run longer than 4 seconds ...
 			time_t	start = time(NULL);
 			int	iterations_before_check = 2048;
+			unsigned	clocks = 0;
 			bool	done = false;
 
-			for(int i=0; i<200000; i++) {
+#define	VCDTRACE
+#ifdef	VCDTRACE
+			Verilated::traceEverOn(true);
+			VerilatedVcdC* tfp = new VerilatedVcdC;
+			tb.trace(tfp, 99);
+			tfp->open("linetest.vcd");
+#define	TRACE_POSEDGE	tfp->dump(10*clocks)
+#define	TRACE_NEGEDGE	tfp->dump(10*clocks+5)
+#define	TRACE_CLOSE	tfp->close()
+#else
+#define	TRACE_POSEDGE	while(0)
+#define	TRACE_NEGEDGE	while(0)
+#define	TRACE_CLOSE	while(0)
+#endif
+
+			for(int i=0; i<(baudclocks*24); i++) {
 				// Clear any initial break condition
 				tb.i_clk = 1;
 				tb.eval();
@@ -188,11 +227,14 @@ int	main(int argc, char **argv) {
 				tb.i_uart = 1;
 			}
 
-			while(!done) {
+			while(clocks < 2*(baudclocks*16)*strlen(string)) {
 				tb.i_clk = 1;
 				tb.eval();
+				TRACE_POSEDGE;
 				tb.i_clk = 0;
 				tb.eval();
+				TRACE_NEGEDGE;
+				clocks++;
 
 				tb.i_uart = (*uart)(tb.o_uart);
 
@@ -234,6 +276,10 @@ int	main(int argc, char **argv) {
 					fprintf(stderr, "CHILD-TIMEOUT\n");
 				}
 			}
-		} 
+
+			TRACE_CLOSE;
+
+			exit(EXIT_SUCCESS);
+		}
 	}
 }
