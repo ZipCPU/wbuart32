@@ -73,11 +73,21 @@ module	linetest(i_clk,
 	reg	[7:0]	buffer	[0:255];
 	reg	[7:0]	head, tail;
 
+	// Create a reset line that will always be true on a power on reset
 	reg	pwr_reset;
 	initial	pwr_reset = 1'b1;
 	always @(posedge i_clk)
 		pwr_reset = 1'b0;
 
+
+
+	// The UART Receiver
+	// 
+	// This is where everything begins, by reading data from the UART.
+	//
+	// Data (rx_data) is present when rx_stb is true.  Any parity or
+	// frame errors will also be valid at that time.  Finally, we'll ignore
+	// errors, and even the clocked uart input distributed from here.
 	wire	rx_stb, rx_break, rx_perr, rx_ferr, rx_ignored;
 	wire	[7:0]	rx_data;
 
@@ -85,10 +95,31 @@ module	linetest(i_clk,
 			rx_break, rx_perr, rx_ferr, rx_ignored);
 
 
+	// The next step in this process is to dump everything we read into a 
+	// FIFO.  First step: writing into the FIFO.  Always write into FIFO
+	// memory.  (The next step will step the memory address if rx_stb was
+	// true ...)
 	wire	[7:0]	nxt_head;
 	assign	nxt_head = head + 8'h01;	
 	always @(posedge i_clk)
 		buffer[head] <= rx_data;
+
+	// Select where in our FIFO memory to write.  On reset, we clear the 
+	// memory.  In all other cases/respects, we step the memory forward.
+	//
+	// However ... we won't step it forward IF ...
+	//	rx_break	- we are in a BREAK condition on the line
+	//		(i.e. ... it's disconnected)
+	//	rx_perr		- We've seen a parity error
+	//	rx_ferr		- Same thing for a frame error
+	//	nxt_head != tail - If the FIFO is already full, we'll just drop
+	//		this new value, rather than dumping random garbage
+	//		from the FIFO until we go round again ...  i.e., we
+	//		don't write on potential overflow.
+	//
+	// Adjusting this address will make certain that the next write to the
+	// FIFO goes to the next address--since we've already written the FIFO
+	// memory at this address.
 	initial	head= 8'h00;
 	always @(posedge i_clk)
 		if (pwr_reset)
@@ -100,8 +131,19 @@ module	linetest(i_clk,
 	reg	[7:0]	lineend;
 	reg		run_tx;
 
+	// How much of the FIFO is in use?  head - tail.  What if they wrap
+	// around?  Still: head-tail, but this time truncated to the number of
+	// bits of interest.  It can never be negative ... so ... we're good,
+	// this just measures that number.
 	assign	nused = head-tail;
 
+	// Here's the guts of the algorithm--setting run_tx.  Once set, the
+	// buffer will flush.  Here, we set it on one of two conditions: 1)
+	// a newline is received, or 2) the line is now longer than 80
+	// characters.
+	//
+	// Once the line has ben transmitted (separate from emptying the buffer)
+	// we stop transmitting.
 	initial	run_tx = 0;
 	initial	lineend = 0;
 	always @(posedge i_clk)
@@ -111,25 +153,36 @@ module	linetest(i_clk,
 			lineend <= 8'h00;
 		end else if ((rx_data == 8'h0a)&&(rx_stb))
 		begin
+			// Start transmitting once we get to a newline char
 			lineend <= head+8'h1;
 			run_tx <= 1'b1;
-		end else if ((!run_tx)&&(nused>8'd80)&&(head != tail))
+		end else if ((!run_tx)&&(nused>8'd80))
 		begin
+			// Start transmitting once we get to 80 chars
 			lineend <= head;
 			run_tx <= 1'b1;
 		end else if (tail == lineend)
+			// Line buffer has been emptied
 			run_tx <= 1'b0;
 
+	// Now ... let's deal with the transmitter
 	wire	tx_break, tx_busy;
 	assign	tx_break = 1'b0;
 	reg	[7:0]	tx_data;
 	reg		tx_stb;
 
+	// We'll transmit the data from our FIFO from ... wherever our tail
+	// is pointed.
 	always @(posedge i_clk)
 		tx_data <= buffer[tail];
 	initial	tx_stb = 1'b0;
 	always @(posedge i_clk)
 		tx_stb <= run_tx;
+
+	// We increment the pointer to where we read from any time 1) we are
+	// requesting to transmit a character, and 2) the transmitter was not
+	// busy and thus accepted our request.  At that time, increment the
+	// pointer, and we'll be ready for another round.
 	initial	tail = 8'h00;
 	always @(posedge i_clk)
 		if(pwr_reset)
