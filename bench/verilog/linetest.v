@@ -82,7 +82,7 @@ module	linetest(i_clk,
 
 
 	// The UART Receiver
-	// 
+	//
 	// This is where everything begins, by reading data from the UART.
 	//
 	// Data (rx_data) is present when rx_stb is true.  Any parity or
@@ -171,13 +171,17 @@ module	linetest(i_clk,
 	reg	[7:0]	tx_data;
 	reg		tx_stb;
 
+	// When do we wish to transmit?
+	//
+	// Any time run_tx is true--but we'll give it an extra clock.
+	initial	tx_stb = 1'b0;
+	always @(posedge i_clk)
+		tx_stb <= run_tx;
+
 	// We'll transmit the data from our FIFO from ... wherever our tail
 	// is pointed.
 	always @(posedge i_clk)
 		tx_data <= buffer[tail];
-	initial	tx_stb = 1'b0;
-	always @(posedge i_clk)
-		tx_stb <= run_tx;
 
 	// We increment the pointer to where we read from any time 1) we are
 	// requesting to transmit a character, and 2) the transmitter was not
