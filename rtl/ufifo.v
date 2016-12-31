@@ -132,9 +132,16 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 			else
 				r_unfl <= 1'b1;
 		end
+
 	always @(posedge i_clk)
-		o_data <= fifo[(i_rd)?(r_last+{{(LGFLEN-1){1'b0}},1'b1})
-					:(r_last)];
+		if (will_underflow)
+			o_data <= i_data;
+		else if ((i_rd)&&(r_first == w_last_plus_one))
+			o_data <= i_data;
+		else if (i_rd)
+			o_data <= fifo[r_last+{{(LGFLEN-1){1'b0}},1'b1}];
+		else
+			o_data <= fifo[(r_last)];
 
 	// wire	[(LGFLEN-1):0]	current_fill;
 	// assign	current_fill = (r_first-r_last);
@@ -142,9 +149,12 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 	always @(posedge i_clk)
 		if (i_rst)
 			o_empty_n <= 1'b0;
-		else
-			o_empty_n <= (~i_rd)&&(r_first != r_last)
-					||(i_rd)&&(r_first != w_last_plus_one);
+		else case({i_wr, i_rd})
+			2'b00: o_empty_n <= (r_first != r_last);
+			2'b11: o_empty_n <= (r_first != r_last);
+			2'b10: o_empty_n <= 1'b1;
+			2'b01: o_empty_n <= (r_first != w_last_plus_one);
+		endcase
 
 	reg	[(LGFLEN-1):0]	r_fill;
 	always @(posedge i_clk)
