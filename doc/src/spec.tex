@@ -595,14 +595,15 @@ detailing the I/O ports of the UART receiver, Tbl.~\ref{tbl:txports},
 \end{portlist}\caption{TXUART port list}\label{tbl:txports}
 \end{center}\end{table}
 detailing the I/O ports of the UART transmitter, and Tbl.~\ref{tbl:wbports}
-\begin{table}\begin{center}\begin{portlist}
+\begin{table}\begin{center}\begin{tabular}{|p{1.15in}|p{0.1in}|p{0.75in}|p{3.375in}|}
+\rowcolor[gray]{0.85} Port & W & Direction & Description \\\hline\hline
 {\tt i\_uart\_rx}& 1 & Input & The receive wire coming from the external port\\\hline
 {\tt o\_uart\_tx}& 1 & Output & The transmit wire to be connected to the external port\\\hline
 {\tt o\_uart\_rx\_int}	& 1 & Output & True if a byte may be read from the receiver\\\hline
 {\tt o\_uart\_tx\_int}	& 1 & Output & True if the transmitter is idle\\\hline
 {\tt o\_uart\_rxfifo\_int}&1& Output & True if the receive FIFO is half full\\\hline
 {\tt o\_uart\_txfifo\_int}&1& Output & True if the transmit FIFO is half empty\\\hline
-\end{portlist}\caption{WBUART port list}\label{tbl:wbports}
+\end{tabular}\caption{WBUART port list}\label{tbl:wbports}
 \end{center}\end{table}
 detailing the non--wishbone I/O ports of the wishbone controller.
 
