@@ -104,14 +104,14 @@
 `define	TXU_IDLE	4'hf
 //
 //
-module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data, o_uart, o_busy);
+module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,o_uart_tx, o_busy);
 	parameter	INITIAL_SETUP = 30'd868;
 	input			i_clk, i_reset;
 	input		[29:0]	i_setup;
 	input			i_break;
 	input			i_wr;
 	input		[7:0]	i_data;
-	output	reg		o_uart;
+	output	reg		o_uart_tx;
 	output	wire		o_busy;
 
 	wire	[27:0]	clocks_per_baud, break_condition;
@@ -132,7 +132,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data, o_uart, o_busy);
 	reg		calc_parity, r_busy, zero_baud_counter;
 
 	initial	r_setup = INITIAL_SETUP;
-	initial	o_uart = 1'b1;
+	initial	o_uart_tx = 1'b1;
 	initial	r_busy = 1'b1;
 	initial	state  = `TXU_IDLE;
 	initial	lcl_data= 8'h0;
@@ -142,14 +142,14 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data, o_uart, o_busy);
 	begin
 		if (i_reset)
 		begin
-			o_uart <= 1'b1;
+			o_uart_tx <= 1'b1;
 			r_busy <= 1'b1;
 			state <= `TXU_IDLE;
 			lcl_data <= 8'h0;
 			calc_parity <= 1'b0;
 		end else if (i_break)
 		begin
-			o_uart <= 1'b0;
+			o_uart_tx <= 1'b0;
 			state <= `TXU_BREAK;
 			calc_parity <= 1'b0;
 			r_busy <= 1'b1;
@@ -160,7 +160,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data, o_uart, o_busy);
 		begin
 			state <= `TXU_IDLE;
 			r_busy <= 1'b1;
-			o_uart <= 1'b1;
+			o_uart_tx <= 1'b1;
 			calc_parity <= 1'b0;
 		end else if (state == `TXU_IDLE)	// STATE_IDLE
 		begin
@@ -169,7 +169,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data, o_uart, o_busy);
 			calc_parity <= 1'b0;
 			if ((i_wr)&&(~r_busy))
 			begin	// Immediately start us off with a start bit
-				o_uart <= 1'b0;
+				o_uart_tx <= 1'b0;
 				r_busy <= 1'b1;
 				case(data_bits)
 				2'b00: state <= `TXU_BIT_ZERO;
@@ -180,7 +180,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data, o_uart, o_busy);
 				lcl_data <= i_data;
 				// baud_counter <= clocks_per_baud-28'h01;
 			end else begin // Stay in idle
-				o_uart <= 1'b1;
+				o_uart_tx <= 1'b1;
 				r_busy <= 0;
 				// lcl_data is irrelevant
 				// state <= state;
@@ -191,7 +191,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data, o_uart, o_busy);
 			r_busy <= 1'b1;
 			if (state[3] == 0) // First 8 bits
 			begin
-				o_uart <= lcl_data[0];
+				o_uart_tx <= lcl_data[0];
 				calc_parity <= calc_parity ^ lcl_data[0];
 				if (state == `TXU_BIT_SEVEN)
 					state <= (use_parity)?`TXU_PARITY:`TXU_STOP;
@@ -202,12 +202,12 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data, o_uart, o_busy);
 			begin
 				state <= `TXU_STOP;
 				if (fixd_parity)
-					o_uart <= parity_even;
+					o_uart_tx <= parity_even;
 				else
-					o_uart <= calc_parity^((parity_even)? 1'b1:1'b0);
+					o_uart_tx <= calc_parity^((parity_even)? 1'b1:1'b0);
 			end else if (state == `TXU_STOP)
 			begin // two stop bit(s)
-				o_uart <= 1'b1;
+				o_uart_tx <= 1'b1;
 				if (dblstop)
 					state <= `TXU_SECOND_STOP;
 				else
@@ -216,7 +216,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data, o_uart, o_busy);
 			end else // `TXU_SECOND_STOP and default:
 			begin
 				state <= `TXU_IDLE; // Go back to idle
-				o_uart <= 1'b1;
+				o_uart_tx <= 1'b1;
 				// Still r_busy, since we need to wait
 				// for the baud clock to finish counting
 				// out this last bit.

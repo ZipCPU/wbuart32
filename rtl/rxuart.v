@@ -111,13 +111,13 @@
 `define	RXU_RESET_IDLE		4'he
 `define	RXU_IDLE		4'hf
 
-module rxuart(i_clk, i_reset, i_setup, i_uart, o_wr, o_data, o_break,
+module rxuart(i_clk, i_reset, i_setup, i_uart_rx, o_wr, o_data, o_break,
 			o_parity_err, o_frame_err, o_ck_uart);
 	parameter	INITIAL_SETUP = 30'd868;
 	// 8 data bits, no parity, (at least 1) stop bit
 	input			i_clk, i_reset;
 	input		[29:0]	i_setup;
-	input			i_uart;
+	input			i_uart_rx;
 	output	reg		o_wr;
 	output	reg	[7:0]	o_data;
 	output	reg		o_break;
@@ -152,7 +152,7 @@ module rxuart(i_clk, i_reset, i_setup, i_uart, o_wr, o_data, o_break,
 	initial	ck_uart = 1'b0;
 	always @(posedge i_clk)
 	begin
-		q_uart <= i_uart;
+		q_uart <= i_uart_rx;
 		qq_uart <= q_uart;
 		ck_uart <= qq_uart;
 	end
