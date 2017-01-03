@@ -62,7 +62,7 @@
 	//
 	wire	rx_stb, rx_break, rx_perr, rx_ferr, ck_uart;
 	wire	[7:0]	rx_data_port;
-	rxuart	rx(i_clk, 1'b0, uart_setup, i_rx,
+	rxuart	#(UART_SETUP) rx(i_clk, 1'b0, uart_setup, i_rx,
 			rx_stb, rx_data_port, rx_break,
 			rx_perr, rx_ferr, ck_uart);
 
@@ -71,10 +71,16 @@
 	always @(posedge i_clk)
 		if (rx_stb)
 		begin
-			r_rx_data[11] <= rx_break;
-			r_rx_data[10] <= rx_ferr;
-			r_rx_data[ 9] <= rx_perr;
+			r_rx_data[11] <= (r_rx_data[11])||(rx_break);
+			r_rx_data[10] <= (r_rx_data[10])||(rx_ferr);
+			r_rx_data[ 9] <= (r_rx_data[ 9])||(rx_perr);
 			r_rx_data[7:0]<= rx_data_port;
+		end else if ((i_wb_stb)&&(i_wb_we)
+					&&(i_wb_addr == `UART_RX_ADDR))
+		begin
+			r_rx_data[11] <= (rx_break)&& (!i_wb_data[11]);
+			r_rx_data[10] <= (rx_ferr) && (!i_wb_data[10]);
+			r_rx_data[ 9] <= (rx_perr) && (!i_wb_data[ 9]);
 		end
 	always @(posedge i_clk)
 		if(((i_wb_stb)&&(~i_wb_we)&&(i_wb_addr == `UART_RX_ADDR))
@@ -91,7 +97,7 @@
 	reg	[7:0]	r_tx_data;
 	reg		r_tx_stb, r_tx_break;
 	wire	[31:0]	tx_data;
-	txuart	tx(i_clk, 1'b0, uart_setup,
+	txuart	#(UART_SETUP) tx(i_clk, 1'b0, uart_setup,
 			r_tx_break, r_tx_stb, r_tx_data,
 			o_tx, tx_busy);
 	always @(posedge i_clk)
