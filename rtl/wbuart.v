@@ -52,7 +52,7 @@ module	wbuart(i_clk, i_rst,
 		//
 		o_uart_rx_int, o_uart_tx_int,
 		o_uart_rxfifo_int, o_uart_txfifo_int);
-	parameter	UART_SETUP = 30'd25, // 4MB 8N1, when using 100MHz clock
+	parameter	INITIAL_SETUP = 30'd25, // 4MB 8N1, when using 100MHz clock
 			LGFLEN = 4;
 	//
 	input	i_clk, i_rst;
@@ -74,7 +74,7 @@ module	wbuart(i_clk, i_rst,
 	// baud rate are all captured within this uart_setup register.
 	//
 	reg	[29:0]	uart_setup;
-	initial	uart_setup = UART_SETUP;
+	initial	uart_setup = INITIAL_SETUP;
 	always @(posedge i_clk)
 		// Under wishbone rules, a write takes place any time i_wb_stb
 		// is high.  If that's the case, and if the write was to the
@@ -96,7 +96,7 @@ module	wbuart(i_clk, i_rst,
 	// a stb (true when new data is ready), an 8-bit data out value
 	// valid when stb is high, a break value (true during a break cond.),
 	// and parity/framing error flags--also valid when stb is true.
-	rxuart	#(UART_SETUP) rx(i_clk, (i_rst)||(rx_uart_reset),
+	rxuart	#(INITIAL_SETUP) rx(i_clk, (i_rst)||(rx_uart_reset),
 			uart_setup, i_uart_rx,
 			rx_stb, rx_uart_data, rx_break,
 			rx_perr, rx_ferr, ck_uart);
@@ -289,7 +289,7 @@ module	wbuart(i_clk, i_rst,
 	// time (tx_empty_n) and (!tx_busy) are both true---the condition for
 	// starting to transmit a new byte.)
 	wire	tx_busy;
-	txuart	#(UART_SETUP) tx(i_clk, 1'b0, uart_setup,
+	txuart	#(INITIAL_SETUP) tx(i_clk, 1'b0, uart_setup,
 			r_tx_break, (tx_empty_n), tx_data,
 			o_uart_tx, tx_busy);
 
@@ -307,7 +307,7 @@ module	wbuart(i_clk, i_rst,
 	// whether or not we are actively transmitting.
 	wire	[31:0]	wb_tx_data;
 	assign	wb_tx_data = { 16'h00, 
-				1'h0, txf_err, txf_half_full, tx_empty_n,
+				1'h0, txf_half_full, tx_empty_n, txf_err,
 				ck_uart, o_uart_tx, r_tx_break, tx_busy,
 				txf_wb_data};
 
