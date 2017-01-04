@@ -87,7 +87,7 @@ int	main(int argc, char **argv) {
 
 	tb.i_setup = setup;
 	int baudclocks = setup & 0x0ffffff;
-	tb.i_uart = 1;
+	tb.i_uart_rx = 1;
 	if (run_interactively) {
 		uart = new UARTSIM(port);
 		uart->setup(tb.i_setup);
@@ -99,7 +99,7 @@ int	main(int argc, char **argv) {
 			tb.i_clk = 0;
 			tb.eval();
 
-			tb.i_uart = (*uart)(tb.o_uart);
+			tb.i_uart_rx = (*uart)(tb.o_uart_tx);
 		}
 
 	} else {
@@ -224,7 +224,7 @@ int	main(int argc, char **argv) {
 				tb.i_clk = 0;
 				tb.eval();
 
-				tb.i_uart = 1;
+				tb.i_uart_rx = 1;
 			}
 
 			while(clocks < 2*(baudclocks*16)*strlen(string)) {
@@ -236,7 +236,7 @@ int	main(int argc, char **argv) {
 				TRACE_NEGEDGE;
 				clocks++;
 
-				tb.i_uart = (*uart)(tb.o_uart);
+				tb.i_uart_rx = (*uart)(tb.o_uart_tx);
 
 				if (false) {
 					/*

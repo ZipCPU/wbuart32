@@ -65,7 +65,7 @@ int	main(int argc, char **argv) {
 		tb.i_clk = 0;
 		tb.eval();
 
-		(*uart)(tb.o_uart);
+		(*uart)(tb.o_uart_tx);
 	}
 
 	printf("\n\nSimulation complete\n");

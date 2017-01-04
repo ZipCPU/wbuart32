@@ -126,7 +126,7 @@ int	main(int argc, char **argv) {
 
 			// Now, evaluate the UART, throwing away the received
 			// value since the SpeechTest doesnt use it.
-			(*uart)(tb.o_uart);
+			(*uart)(tb.o_uart_tx);
 
 			tfp->dump(5*(2*testcount+1));
 			testcount++;
@@ -156,7 +156,7 @@ int	main(int argc, char **argv) {
 			(tb.v__DOT__wbuarti__DOT____Vcellinp__txfifo____pinNumber5)?"RD":"  ",
 			(tb.v__DOT__wbuarti__DOT__tx_empty_n)?"TXI":"EMP",
 			(tb.v__DOT__wbuarti__DOT__tx_data),
-			(tb.o_uart));
+			(tb.o_uart_tx));
 #endif
 		}
 
@@ -377,8 +377,8 @@ int	main(int argc, char **argv) {
 				tb.eval();
 
 				// Advance the UART based upon the output
-				// o_uart value
-				(*uart)(tb.o_uart);
+				// o_uart_tx value
+				(*uart)(tb.o_uart_tx);
 			}
 
 			// We will never get here.  If all goes well, we will be
