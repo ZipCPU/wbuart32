@@ -42,10 +42,11 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 	input			i_wr;
 	input	[(BW-1):0]	i_data;
 	input			i_rd;
-	output	reg [(BW-1):0]	o_data;
-	output	reg		o_empty_n, o_half_full;
+	output	wire [(BW-1):0]	o_data;
+	output	reg		o_empty_n;
+	output	wire		o_half_full;
 	output	wire	[15:0]	o_status;
-	output	wire		o_err;
+	output	reg		o_err;
 
 	localparam	FLEN=(1<<LGFLEN);
 
@@ -133,15 +134,26 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 				r_unfl <= 1'b1;
 		end
 
+	reg	[7:0]	fifo_here, fifo_next, r_data;
+	always @(posedge i_clk)
+		fifo_here <= fifo[r_last];
+	always @(posedge i_clk)
+		fifo_next <= fifo[r_last+{{(LGFLEN-1){1'b0}},1'b1}];
+	always @(posedge i_clk)
+		r_data <= i_data;
+
+	reg	[1:0]	osrc;
 	always @(posedge i_clk)
 		if (will_underflow)
-			o_data <= i_data;
+			// o_data <= i_data;
+			osrc <= 2'b00;
 		else if ((i_rd)&&(r_first == w_last_plus_one))
-			o_data <= i_data;
+			osrc <= 2'b01;
 		else if (i_rd)
-			o_data <= fifo[r_last+{{(LGFLEN-1){1'b0}},1'b1}];
+			osrc <= 2'b11;
 		else
-			o_data <= fifo[(r_last)];
+			osrc <= 2'b10;
+	assign o_data = (osrc[1]) ? ((osrc[0])?fifo_next:fifo_here) : r_data;
 
 	// wire	[(LGFLEN-1):0]	current_fill;
 	// assign	current_fill = (r_first-r_last);
@@ -167,6 +179,15 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 		else
 			r_fill <= r_first - r_last;
 	assign	o_half_full = r_fill[(LGFLEN-1)];
+
+	initial	o_err = 1'b0;
+	always @(posedge i_clk)
+		if (i_rst)
+			o_err <= 1'b0;
+		else if ((i_wr)&&(!i_rd)&&(will_overflow))
+			o_err <= 1'b1;
+		else if ((!i_wr)&&(i_rd)&&(will_underflow))
+			o_err <= 1'b1;
 
 	wire	[3:0]	lglen;
 	assign lglen = LGFLEN;
