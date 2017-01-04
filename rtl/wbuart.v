@@ -69,6 +69,8 @@ module	wbuart(i_clk, i_rst,
 	output	wire		o_uart_rx_int, o_uart_tx_int,
 				o_uart_rxfifo_int, o_uart_txfifo_int;
 
+	wire	tx_busy;
+
 	//
 	// The UART setup parameters: bits per byte, stop bits, parity, and
 	// baud rate are all captured within this uart_setup register.
@@ -288,7 +290,6 @@ module	wbuart(i_clk, i_rst,
 	// we read it here.  (You might notice above, we register a read any
 	// time (tx_empty_n) and (!tx_busy) are both true---the condition for
 	// starting to transmit a new byte.)
-	wire	tx_busy;
 	txuart	#(INITIAL_SETUP) tx(i_clk, 1'b0, uart_setup,
 			r_tx_break, (tx_empty_n), tx_data,
 			o_uart_tx, tx_busy);
