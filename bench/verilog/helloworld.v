@@ -52,13 +52,13 @@ module	helloworld(i_clk,
 `ifndef	OPT_STANDALONE
 			i_setup,
 `endif
-			o_uart);
+			o_uart_tx);
 	//
 	input		i_clk;
+	output	wire	o_uart_tx;
 `ifndef	OPT_STANDALONE
 	input	[29:0]	i_setup;
 `endif
-	output	wire	o_uart;
 
 	// If i_setup isnt set up as an input parameter, it needs to be set.
 	// We do so here, to a setting appropriate to create a 115200 Baud
@@ -122,6 +122,6 @@ module	helloworld(i_clk,
 			tx_stb <= 1'b0;
 
 	txuart	transmitter(i_clk, pwr_reset, i_setup, tx_break,
-			tx_stb, tx_data, o_uart, tx_busy);
+			tx_stb, tx_data, o_uart_tx, tx_busy);
 
 endmodule
