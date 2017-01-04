@@ -47,7 +47,7 @@
 // ratio of your onboard clock to your desired baud rate.  For more information
 // about how to set this, please see the specification.
 //
-`define OPT_STANDALONE
+// `define OPT_STANDALONE
 //
 module	linetest(i_clk,
 `ifndef	OPT_STANDALONE
