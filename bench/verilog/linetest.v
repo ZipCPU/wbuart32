@@ -47,19 +47,19 @@
 // ratio of your onboard clock to your desired baud rate.  For more information
 // about how to set this, please see the specification.
 //
-//`define OPT_STANDALONE
+`define OPT_STANDALONE
 //
 module	linetest(i_clk,
 `ifndef	OPT_STANDALONE
 			i_setup,
 `endif
-			i_uart, o_uart);
+			i_uart_rx, o_uart_tx);
 	input		i_clk;
 `ifndef	OPT_STANDALONE
 	input	[29:0]	i_setup;
 `endif
-	input		i_uart;
-	output	wire	o_uart;
+	input		i_uart_rx;
+	output	wire	o_uart_tx;
 
 	// If i_setup isnt set up as an input parameter, it needs to be set.
 	// We do so here, to a setting appropriate to create a 115200 Baud
@@ -91,7 +91,7 @@ module	linetest(i_clk,
 	wire	rx_stb, rx_break, rx_perr, rx_ferr, rx_ignored;
 	wire	[7:0]	rx_data;
 
-	rxuart	receiver(i_clk, pwr_reset, i_setup, i_uart, rx_stb, rx_data,
+	rxuart	receiver(i_clk, pwr_reset, i_setup, i_uart_rx, rx_stb, rx_data,
 			rx_break, rx_perr, rx_ferr, rx_ignored);
 
 
@@ -151,9 +151,10 @@ module	linetest(i_clk,
 		begin
 			run_tx <= 1'b0;
 			lineend <= 8'h00;
-		end else if ((rx_data == 8'h0a)&&(rx_stb))
+		end else if(((rx_data == 8'h0a)||(rx_data == 8'hd))&&(rx_stb))
 		begin
-			// Start transmitting once we get to a newline char
+			// Start transmitting once we get to either a newline
+			// or a carriage return character
 			lineend <= head+8'h1;
 			run_tx <= 1'b1;
 		end else if ((!run_tx)&&(nused>8'd80))
@@ -195,6 +196,6 @@ module	linetest(i_clk,
 			tail <= tail + 8'h01;
 			
 	txuart	transmitter(i_clk, pwr_reset, i_setup, tx_break,
-			tx_stb, tx_data, o_uart, tx_busy);
+			tx_stb, tx_data, o_uart_tx, tx_busy);
 
 endmodule
