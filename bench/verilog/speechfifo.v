@@ -57,9 +57,9 @@ module	speechfifo(i_clk,
 `ifndef	OPT_STANDALONE
 			i_setup,
 `endif
-			o_uart);
+			o_uart_tx);
 	input		i_clk;
-	output	wire	o_uart;
+	output	wire	o_uart_tx;
 
 	// The i_setup wires are input when run under Verilator, but need to
 	// be set internally if this is going to run as a standalone top level
@@ -185,7 +185,7 @@ module	speechfifo(i_clk,
 	always @(posedge i_clk)
 		if (restart)
 			wb_stb <= 1'b1;
-		else if (msg_index >= 1497)
+		else if (msg_index >= 1481)
 			wb_stb <= 1'b0;
 		else if (tx_int)
 			wb_stb <= 1'b1;
@@ -200,11 +200,11 @@ module	speechfifo(i_clk,
 
 	// Finally--the unit under test--now that we've set up all the wires
 	// to run/test it.
-	wbuart	#(30'h25)
+	wbuart	#(30'h868)
 		wbuarti(i_clk, pwr_reset,
 			wb_stb, wb_stb, 1'b1, wb_addr, wb_data,
 			uart_stall, uart_ack, uart_data,
-			1'b1, o_uart,
+			1'b1, o_uart_tx,
 			ignored_rx_int, tx_int,
 			ignored_rxfifo_int, txfifo_int);
 
