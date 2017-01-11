@@ -75,6 +75,7 @@ module	speechfifo(i_clk,
 	input	[29:0]	i_setup;
 `endif
 
+	reg		restart;
 	reg		wb_stb;
 	reg	[1:0]	wb_addr;
 	reg	[31:0]	wb_data;
@@ -101,9 +102,9 @@ module	speechfifo(i_clk,
 	integer	i;
 	reg	[7:0]	message [0:2047];
 	initial begin
-		for(i=0; i<2048; i=i+1)
-			message[i] = 8'h20;
 		$readmemh("speech.hex",message);
+		for(i=1481; i<2048; i=i+1)
+			message[i] = 8'h20;
 	end
 
 	// Let's keep track of time, and send our message over and over again.
@@ -121,12 +122,9 @@ module	speechfifo(i_clk,
 	// let's build a set of signals that we can use to get things started
 	// again.  This will be the restart signal.  On this signal, we just
 	// restart everything.
-	reg	restart;
 	initial	restart = 0;
 	always @(posedge i_clk)
-	begin
 		restart <= (restart_counter == 0);
-	end
 
 	// Our message index.  This is the address of the character we wish to
 	// transmit next.  Note, there's a clock delay between setting this 
@@ -181,11 +179,18 @@ module	speechfifo(i_clk,
 	// our data.  Once we've filled half of the FIFO, we wait for the FIFO
 	// to empty before issuing a STB again and then fill up half the FIFO
 	// again.
+	reg	end_of_message;
+	initial	end_of_message = 1'b1;
+	always @(posedge i_clk)
+		if (restart)
+			end_of_message <= 1'b0;
+		else
+			end_of_message <= (msg_index >= 1481);
 	initial	wb_stb = 1'b0;
 	always @(posedge i_clk)
 		if (restart)
 			wb_stb <= 1'b1;
-		else if (msg_index >= 1481)
+		else if (end_of_message)
 			wb_stb <= 1'b0;
 		else if (tx_int)
 			wb_stb <= 1'b1;
