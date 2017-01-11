@@ -46,18 +46,18 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 	output	reg		o_empty_n;
 	output	wire		o_half_full;
 	output	wire	[15:0]	o_status;
-	output	reg		o_err;
+	output	wire		o_err;
 
 	localparam	FLEN=(1<<LGFLEN);
 
 	reg	[(BW-1):0]	fifo[0:(FLEN-1)];
-	reg	[(LGFLEN-1):0]	r_first, r_last;
+	reg	[(LGFLEN-1):0]	r_first, r_last, r_next;
 
 	wire	[(LGFLEN-1):0]	w_first_plus_one, w_first_plus_two,
 				w_last_plus_one;
 	assign	w_first_plus_two = r_first + {{(LGFLEN-2){1'b0}},2'b10};
 	assign	w_first_plus_one = r_first + {{(LGFLEN-1){1'b0}},1'b1};
-	assign	w_last_plus_one  = r_last  + {{(LGFLEN-1){1'b0}},1'b1};
+	assign	w_last_plus_one  = r_next; // r_last  + 1'b1;
 
 	reg	will_overflow;
 	initial	will_overflow = 1'b0;
@@ -120,17 +120,20 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 	always @(posedge i_clk)
 		if (i_rst)
 		begin
-			r_last <= { (LGFLEN){1'b0} };
+			r_last <= 0;
+			r_next <= { {(LGFLEN-1){1'b0}}, 1'b1 };
 			r_unfl <= 1'b0;
 		end else if (i_rd)
 		begin
 			if ((i_wr)||(!will_underflow)) // (r_first != r_last)
-				r_last <= w_last_plus_one;
+			begin
+				r_last <= r_next;
+				r_next <= r_last +{{(LGFLEN-2){1'b0}},2'b10};
 				// Last chases first
 				// Need to be prepared for a possible two
 				// reads in quick succession
 				// o_data <= fifo[r_last+1];
-			else
+			end else
 				r_unfl <= 1'b1;
 		end
 
@@ -138,7 +141,7 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 	always @(posedge i_clk)
 		fifo_here <= fifo[r_last];
 	always @(posedge i_clk)
-		fifo_next <= fifo[r_last+{{(LGFLEN-1){1'b0}},1'b1}];
+		fifo_next <= fifo[r_next];
 	always @(posedge i_clk)
 		r_data <= i_data;
 
@@ -173,21 +176,14 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 		if (i_rst)
 			r_fill <= 0;
 		else if ((i_rd)&&(!i_wr))
-			r_fill <= r_first - r_last - 1'b1;
+			r_fill <= r_first - r_next;
 		else if ((!i_rd)&&(i_wr))
 			r_fill <= r_first - r_last + 1'b1;
 		else
 			r_fill <= r_first - r_last;
 	assign	o_half_full = r_fill[(LGFLEN-1)];
 
-	initial	o_err = 1'b0;
-	always @(posedge i_clk)
-		if (i_rst)
-			o_err <= 1'b0;
-		else if ((i_wr)&&(!i_rd)&&(will_overflow))
-			o_err <= 1'b1;
-		else if ((!i_wr)&&(i_rd)&&(will_underflow))
-			o_err <= 1'b1;
+	assign o_err = (r_ovfl) || (r_unfl);
 
 	wire	[3:0]	lglen;
 	assign lglen = LGFLEN;
