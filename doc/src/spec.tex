@@ -210,7 +210,8 @@ output bit when the clock is low, and the core takes care of everything else.
 
 Finally, there are a series of example files found in the bench/verilog
 directory.  {\tt helloworld.v} presents an example of a simple UART transmitter
-sending the ``Hello, World \\r\\n'' message over and over again.  This example
+sending the ``Hello, World {\textbackslash}r{\textbackslash}n'' message over
+and over again.  This example
 uses only the {\tt txuart.v} module, and can be simulated in Verilator.
 A second test file, {\tt linetest.v}, works by waiting for a line of data to be
 received, after which it parrots that line back to the terminal.  This tests
@@ -350,6 +351,19 @@ P&F&T&Setting \\\hline\hline
 0 & & & No parity \\\hline
 \end{tabular}\caption{Parity setup}\label{tbl:parity}
 \end{center}\end{table}
+
+The final portion of this register is the baud {\tt CLKS}.  This is the number
+of ticks of your ssytem clock per baud interval,
+\begin{eqnarray*}
+{\tt CLKS} &=& \frac{f_{\mbox{\tiny SYS}}}{f_{\mbox{\tiny BAUD}}}.
+\end{eqnarray*}
+Rounding to the nearest integer is recommended.  Hence, if you have a system
+clock of 100~MHz and wish to achieve 115,200~Baud, you would set {\tt CLKS} to
+\begin{eqnarray*}
+{\tt CLKS}_{\tiny{\tt Example}} &=& \frac{100 \cdot 10^6}{115200}
+	\frac{\mbox{Clocks per Second}}{\mbox{Baud Intervals per Second}}
+	\approx 868 \mbox{ Clocks per Baud Interval}
+\end{eqnarray*}
 
 Changes to this setup register will take place in the transmitter as soon as
 the transmitter is idle and ready to accept another byte.
