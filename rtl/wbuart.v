@@ -243,7 +243,7 @@ module	wbuart(i_clk, i_rst,
 			txf_wb_write, txf_wb_data,
 				(~tx_busy)&&(tx_empty_n), tx_data,
 			tx_empty_n, txf_half_full, txf_status, txf_err);
-	// Let's grab two interrupts from the FIFO for the CPU.
+	// Let's create two transmit based interrupts from the FIFO for the CPU.
 	//	The first will be true any time the FIFO is empty.
 	assign	o_uart_tx_int = !tx_empty_n;
 	//	The second will be true any time the FIFO is less than half

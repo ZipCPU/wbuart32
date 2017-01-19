@@ -149,7 +149,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,o_uart_tx, o_busy);
 		begin
 			state <= `TXU_BREAK;
 			r_busy <= 1'b1;
-		end else if (~zero_baud_counter)
+		end else if (!zero_baud_counter)
 		begin // r_busy needs to be set coming into here
 			r_busy <= 1'b1;
 		end else if (state == `TXU_BREAK)
@@ -158,7 +158,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,o_uart_tx, o_busy);
 			r_busy <= 1'b1;
 		end else if (state == `TXU_IDLE)	// STATE_IDLE
 		begin
-			if ((i_wr)&&(~r_busy))
+			if ((i_wr)&&(!r_busy))
 			begin	// Immediately start us off with a start bit
 				r_busy <= 1'b1;
 				case(data_bits)
@@ -282,6 +282,46 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,o_uart_tx, o_busy);
 			calc_parity <= parity_even;
 
 
+	// All of the above logic is driven by the baud counter.  Bits must last
+	// clocks_per_baud in length, and this baud counter is what we use to
+	// make certain of that.
+	//
+	// The basic logic is this: at the beginning of a bit interval, start
+	// the baud counter and set it to count clocks_per_baud.  When it gets
+	// to zero, restart it.
+	//
+	// However, comparing a 28'bit number to zero can be rather complex--
+	// especially if we wish to do anything else on that same clock.  For
+	// that reason, we create "zero_baud_counter".  zero_baud_counter is
+	// nothing more than a flag that is true anytime baud_counter is zero.
+	// It's true when the logic (above) needs to step to the next bit.
+	// Simple enough?
+	//
+	// I wish we could stop there, but there are some other (ugly)
+	// conditions to deal with that offer exceptions to this basic logic.
+	//
+	// 1. When the user has commanded a BREAK across the line, we need to
+	// wait several baud intervals following the break before we start
+	// transmitting, to give any receiver a chance to recognize that we are
+	// out of the break condition, and to know that the next bit will be
+	// a stop bit.
+	//
+	// 2. A reset is similar to a break condition--on both we wait several
+	// baud intervals before allowing a start bit.
+	//
+	// 3. In the idle state, we stop our counter--so that upon a request
+	// to transmit when idle we can start transmitting immediately, rather
+	// than waiting for the end of the next (fictitious and arbitrary) baud
+	// interval.
+	//
+	// When (i_wr)&&(!r_busy)&&(state == `TXU_IDLE) then we're not only in
+	// the idle state, but we also just accepted a command to start writing
+	// the next word.  At this point, the baud counter needs to be reset
+	// to the number of clocks per baud, and zero_baud_counter set to zero.
+	//
+	// The logic is a bit twisted here, in that it will only check for the
+	// above condition when zero_baud_counter is false--so as to make
+	// certain the STOP bit is complete.
 	initial	zero_baud_counter = 1'b0;
 	initial	baud_counter = 28'h05;
 	always @(posedge i_clk)
