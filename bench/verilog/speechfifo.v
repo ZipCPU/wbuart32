@@ -61,16 +61,18 @@ module	speechfifo(i_clk,
 	input		i_clk;
 	output	wire	o_uart_tx;
 
+	// Here we set i_setup to something appropriate to create a 115200 Baud
+	// UART system from a 100MHz clock.  This also sets us to an 8-bit data
+	// word, 1-stop bit, and no parity.  This will be overwritten by
+	// i_setup, but at least it gives us something to start with/from.
+	parameter	INITIAL_UART_SETUP = 30'd868;
+
 	// The i_setup wires are input when run under Verilator, but need to
 	// be set internally if this is going to run as a standalone top level
 	// test configuration.
 `ifdef	OPT_STANDALONE
 	wire	[29:0]	i_setup;
-
-	// Here we set i_setup to something appropriate to create a 115200 Baud
-	// UART system from a 100MHz clock.  This also sets us to an 8-bit data
-	// word, 1-stop bit, and no parity.
-	assign	i_setup = 30'd868;
+	assign	i_setup = INITIAL_UART_SETUP;
 `else
 	input	[29:0]	i_setup;
 `endif
@@ -173,12 +175,13 @@ module	speechfifo(i_clk,
 		else // if (!uart_stall)??
 			wb_addr <= 2'b11;
 
-	// The wb_stb signal indicates that we wish to write, using the wishbone
-	// to our peripheral.  We have two separate types of writes.  First,
-	// we wish to write our setup.  Then we want to drop STB and write
-	// our data.  Once we've filled half of the FIFO, we wait for the FIFO
-	// to empty before issuing a STB again and then fill up half the FIFO
-	// again.
+	// Knowing when to stop sending the speech is important, but depends
+	// upon an 11 bit comparison.  Since FPGA logic is best measured by the
+	// number of inputs to an always block, we pull those 11-bits out of
+	// the always block for wb_stb, and place them here on the clock prior.
+	// If end_of_message is true, then we need to stop transmitting, and
+	// wait for the next (restart) to get us started again.  We set that
+	// flag hee.
 	reg	end_of_message;
 	initial	end_of_message = 1'b1;
 	always @(posedge i_clk)
@@ -186,17 +189,36 @@ module	speechfifo(i_clk,
 			end_of_message <= 1'b0;
 		else
 			end_of_message <= (msg_index >= 1481);
+
+	// The wb_stb signal indicates that we wish to write, using the wishbone
+	// to our peripheral.  We have two separate types of writes.  First,
+	// we wish to write our setup.  Then we want to drop STB and write
+	// our data.  Once we've filled half of the FIFO, we wait for the FIFO
+	// to empty before issuing a STB again and then fill up half the FIFO
+	// again.
 	initial	wb_stb = 1'b0;
 	always @(posedge i_clk)
 		if (restart)
+			// Start sending to the UART on a reset.  The first
+			// thing we'll send will be the configuration, but
+			// that's done elsewhere.  This just starts up the
+			// writes to the peripheral wbuart.
 			wb_stb <= 1'b1;
 		else if (end_of_message)
+			// Stop transmitting when we get to the end of our
+			// message.
 			wb_stb <= 1'b0;
 		else if (tx_int)
+			// If we aren't at the end of the message, and tx_int
+			// tells us the FIFO is empty, then start writing into
+			// the FIFO>
 			wb_stb <= 1'b1;
 		else if (txfifo_int)
+			// If we are writing into the FIFO, and it's less than
+			// half full (i.e. txfifo_int is true) then keep going.
 			wb_stb <= wb_stb;
 		else
+			// But once the FIFO gets to half full, stop.
 			wb_stb <= 1'b0;
 
 	// We aren't using the receive interrupts, so we'll just mark them
@@ -205,7 +227,7 @@ module	speechfifo(i_clk,
 
 	// Finally--the unit under test--now that we've set up all the wires
 	// to run/test it.
-	wbuart	#(30'h868)
+	wbuart	#(INITIAL_UART_SETUP)
 		wbuarti(i_clk, pwr_reset,
 			wb_stb, wb_stb, 1'b1, wb_addr, wb_data,
 			uart_stall, uart_ack, uart_data,
