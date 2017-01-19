@@ -125,6 +125,7 @@ mkspeech: mkspeech.cpp
 # dependency, but ... it is what it is.
 speech.hex: mkspeech speech.txt
 	./mkspeech speech.txt
+	bash -c "if [ -d ../verilog/ ]; then cp speech.hex ../verilog/; fi"
 
 # Now, if the speech.hex file is available, then we can perform our final build.
 # Actually, we could've done this without the speech file being available, but
