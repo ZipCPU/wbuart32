@@ -17,6 +17,11 @@
 //	run as a top-level testing file, requiring only the transmit and receive
 //	UART pins and the clock to work.
 //
+//	DON'T FORGET TO TURN OFF HARDWARE FLOW CONTROL!  ... or this'll never
+//	work.  If you want to run with hardware flow control on, add another
+//	wire to this module in order to set o_cts to 1'b1.
+//
+//
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
