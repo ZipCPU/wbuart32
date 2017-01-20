@@ -129,6 +129,7 @@ module rxuart(i_clk, i_reset, i_setup, i_uart_rx, o_wr, o_data, o_break,
 	wire	[1:0]	data_bits;
 	wire		use_parity, parity_even, dblstop, fixd_parity;
 	reg	[29:0]	r_setup;
+	reg	[3:0]	state;
 
 	assign	clocks_per_baud = { 4'h0, r_setup[23:0] };
 	assign	data_bits   = r_setup[29:28];
@@ -245,7 +246,6 @@ module rxuart(i_clk, i_reset, i_setup, i_uart_rx, o_wr, o_data, o_break,
 	//	Logic outputs (4):
 	//		state
 	//
-	reg	[3:0]	state;
 	initial	state = `RXU_RESET_IDLE;
 	always @(posedge i_clk)
 	begin
