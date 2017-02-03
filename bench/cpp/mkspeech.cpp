@@ -41,58 +41,149 @@
 #include <unistd.h>
 #include <string.h>
 
+/*
+* endswith
+*
+* Real simple: returns true if the given string ends with the given ending.
+* Useful for determining if a file ends with the extension .txt.
+*
+*/
+bool	endswith(const char *str, const char *ending) {
+	int	slen = strlen(str), send = strlen(ending);
+	if (slen < send)
+		return false;
+	if (strcmp(&str[slen-send], ".txt")!=0)
+		return false;
+	return true;
+}
+
+/*
+* usage()
+*
+* Tell the user the calling conventions of this program, and what the program
+* can be used to accomplish.
+*/
+void	usage(void) {
+	fprintf(stderr, "USAGE:\tmkspeech [-x] <filename>.txt [-o <outfile>]\n");
+	fprintf(stderr, "\n"
+"\tConverts a text file to a file such as can be included in a Verilog\n"
+"\tprogram.  Without the -x argument, the mkspeech program defaults\n"
+"\tto converting the text file to a hex file, whose output name defaults\n"
+"\tto \'speech.hex\'.  With the -x argument, mkspeech converts the file\n"
+"\tinto an include file such as might be used in a Verilog program\n"
+"\tif and when the synthesis tool doesn\'t support hex files (Xilinx\'s\n"
+"\tISE).  In this case, the output filename defaults to \'speech.inc\'.\n"
+"\n\n");
+}
+
 int main(int argc, char **argv) {
 	FILE	*fp, *fout;
+	const	char	*input_filename = NULL, *output_filename = NULL;
+	bool	xise_file = false;
 
-	if (argc != 2) {
-		fprintf(stderr, "Err: USAGE is mkspeech <filename>.txt\n");
-		exit(EXIT_FAILURE);
-	} else if ((!argv[1])||(strlen(argv[1])<5)
-		||(strcmp(&argv[1][strlen(argv[1])-4], ".txt")!=0)) {
-		fprintf(stderr, "Err: %s is an invalid text file name\n", argv[1]);
-		exit(EXIT_FAILURE);
-	} else if (access(argv[1], F_OK)!=0) {
-		fprintf(stderr, "Err: %s is not a file\n", argv[1]);
-		exit(EXIT_FAILURE);
-	} else if (access(argv[1], R_OK)!=0) {
-		fprintf(stderr, "Err: Cannot read %s\n", argv[1]);
+	for(int argn=1; argn < argc; argn++) {
+		if (argv[argn][0] == '-') {
+			if (argv[argn][2] == '\0') {
+				if (argv[argn][1] == 'x')
+					xise_file = true;
+				else if (argv[argn][1] == 'o') {
+					if (argn+1<argc)
+						output_filename = argv[++argn];
+					else  {
+					fprintf(stderr, "ERR: -o given, but no filename given");
+						usage();
+						exit(EXIT_FAILURE);
+					}
+				} else {
+					fprintf(stderr, "ERR: Unknown argument, %s\n", argv[argn]);
+					usage();
+					exit(EXIT_FAILURE);
+				}
+			} else {
+				fprintf(stderr, "ERR: Unknown argument, %s\n", argv[argn]);
+				usage();
+				exit(EXIT_FAILURE);
+			}
+		} else if (input_filename == NULL) {
+			input_filename = argv[argn];
+		} else {
+			fprintf(stderr, "ERR: Too many file names given, %s when I already have %s\n", argv[argn], input_filename);
+			usage();
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	if (input_filename== NULL) {
+		fprintf(stderr, "No filename given\n");
+		usage();
 		exit(EXIT_FAILURE);
 	}
 
-	fp = fopen(argv[1], "r");
+	if (!endswith(input_filename, ".txt")) {
+		fprintf(stderr, "Err: %s is an invalid text file name\n", input_filename);
+		exit(EXIT_FAILURE);
+	}
+
+	if (access(input_filename, F_OK)!=0) {
+		fprintf(stderr, "Err: %s is not a file\n", input_filename);
+		exit(EXIT_FAILURE);
+	} else if (access(input_filename, R_OK)!=0) {
+		fprintf(stderr, "Err: Cannot read %s\n", input_filename);
+		exit(EXIT_FAILURE);
+	}
+
+	fp = fopen(input_filename, "r");
 	if (fp == NULL) {
-		fprintf(stderr, "Err: Cannot read %s\n", argv[1]);
+		fprintf(stderr, "Err: Cannot read %s\n", input_filename);
 		exit(EXIT_FAILURE);
 	}
 
-	fout = fopen("speech.hex", "w");
+	if (output_filename == NULL)
+		output_filename = (xise_file) ? "speech.inc" : "speech.hex";
+
+	fout = fopen(output_filename, "w");
 	if (fout == NULL) {
-		fprintf(stderr, "Err: Cannot write %s\n", "speech.hex");
+		fprintf(stderr, "Err: Cannot write %s\n", output_filename);
 		exit(EXIT_FAILURE);
 	}
 
-	int	linelen = 0;
-	int	ch, addr = 0;
+	if (xise_file) {
+		// Build an include file
+		int	ch, addr = 0;
+		while((ch = fgetc(fp))!=EOF) {
+			if (ch == '\n')
+				fprintf(fout, "\t\tmessage[%4d] = 8\'h%02x;\n",
+					addr++, '\n');
+			fprintf(fout, "\t\tmessage[%4d] = 8\'h%02x;\n",
+				addr++, ch);
+		}
 
-	fprintf(fout, "@%08x ", addr); linelen += 4+6;
-	while((ch = fgetc(fp))!=EOF) {
-		if (ch == '\n') {
-			fprintf(fout, "%02x ", '\r' & 0x0ff); linelen += 3; addr++;
+		for(; addr<2048; addr++)
+			fprintf(fout, "\t\tmessage[%4d] = 8'h%02x;\n", addr, ' ');
+	} else {
+		// Bulid a proper hex file
+		int	linelen = 0;
+		int	ch, addr = 0;
+
+		fprintf(fout, "@%08x ", addr); linelen += 4+6;
+		while((ch = fgetc(fp))!=EOF) {
+			if (ch == '\n') {
+				fprintf(fout, "%02x ", '\r' & 0x0ff); linelen += 3; addr++;
+				if (linelen >= 77) {
+					fprintf(fout, "\n");
+					linelen = 0;
+					fprintf(fout, "@%08x ", addr); linelen += 4+6;
+				}
+			}
+			fprintf(fout, "%02x ", ch & 0x0ff); linelen += 3; addr++;
+
 			if (linelen >= 77) {
 				fprintf(fout, "\n");
 				linelen = 0;
 				fprintf(fout, "@%08x ", addr); linelen += 4+6;
 			}
-		}
-		fprintf(fout, "%02x ", ch & 0x0ff); linelen += 3; addr++;
-
-		if (linelen >= 77) {
-			fprintf(fout, "\n");
-			linelen = 0;
-			fprintf(fout, "@%08x ", addr); linelen += 4+6;
-		}
-	} fprintf(fout, "\n");
-
+		} fprintf(fout, "\n");
+	}
 	fclose(fp);
 	fclose(fout);
 }
