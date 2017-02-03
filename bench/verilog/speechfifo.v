@@ -51,7 +51,9 @@
 // the ratio of your onboard clock to your desired baud rate.  For more
 // information about how to set this, please see the specification.
 //
-//`define OPT_STANDALONE
+`ifndef	VERILATOR
+`define OPT_STANDALONE
+`endif
 //
 module	speechfifo(i_clk,
 `ifndef	OPT_STANDALONE
@@ -104,9 +106,36 @@ module	speechfifo(i_clk,
 	integer	i;
 	reg	[7:0]	message [0:2047];
 	initial begin
-		$readmemh("speech.hex",message);
+		// xx Verilator needs this file to be in the directory the file
+		// is run from.  For that reason, the project builds, makes,
+		// and keeps speech.hex in bench/cpp.  
+		//
+		// Vivado, however, wants speech.hex to be in a project file
+		// directory, such as bench/verilog.  For that reason, the
+		// build function in bench/cpp also copies speech.hex to the
+		// bench/verilog directory.  You may need to make certain the
+		// file is both built, and copied into a directory where your
+		// synthesis tool can find it.
+		//
+		$readmemh("speech.hex", message);
 		for(i=1481; i<2048; i=i+1)
 			message[i] = 8'h20;
+		//
+		// The problem with the above approach is Xilinx's ISE program.
+		// It's broken.  It can't handle HEX files well (at all?) and
+		// has more problems with HEX's defining ROM's.  For that
+		// reason, the mkspeech program can be tuned to create an
+		// include file, speech.inc.  We include that program here.
+		// It is rather ugly, though, and not a very elegant solution,
+		// since it walks through every value in our speech, byte by
+		// byte, with an initial line for each byte declaring what it
+		// is to be.
+		//
+		// If you (need to) use this route, comment out both the 
+		// readmemh, the for loop, and the message[i] = 8'h20 lines
+		// above and uncomment the include line below.
+		//
+		// `include "speech.inc"
 	end
 
 	// Let's keep track of time, and send our message over and over again.
@@ -230,7 +259,7 @@ module	speechfifo(i_clk,
 	wbuart	#(INITIAL_UART_SETUP)
 		wbuarti(i_clk, pwr_reset,
 			wb_stb, wb_stb, 1'b1, wb_addr, wb_data,
-			uart_stall, uart_ack, uart_data,
+			uart_ack, uart_stall, uart_data,
 			1'b1, o_uart_tx,
 			ignored_rx_int, tx_int,
 			ignored_rxfifo_int, txfifo_int);

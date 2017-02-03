@@ -27,7 +27,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -45,7 +45,7 @@
 module	wbuart(i_clk, i_rst,
 		//
 		i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data,
-			o_wb_stall, o_wb_ack, o_wb_data,
+			o_wb_ack, o_wb_stall, o_wb_data,
 		//
 		i_uart_rx, o_uart_tx,
 		// i_uart_rts, o_uart_cts, i_uart_dtr, o_uart_dts
@@ -60,8 +60,8 @@ module	wbuart(i_clk, i_rst,
 	input			i_wb_cyc, i_wb_stb, i_wb_we;
 	input		[1:0]	i_wb_addr;
 	input		[31:0]	i_wb_data;
-	output	wire		o_wb_stall;
 	output	reg		o_wb_ack;
+	output	wire		o_wb_stall;
 	output	reg	[31:0]	o_wb_data;
 	//
 	input			i_uart_rx;
