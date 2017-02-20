@@ -40,33 +40,41 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-// Uncomment the next line if you want this program to work as a standalone
-// (not verilated) RTL "program" to test your UART.  You'll also need to set
-// your setup condition properly, though.  I recommend setting it to the 
-// ratio of your onboard clock to your desired baud rate.  For more information
-// about how to set this, please see the specification.
+// One issue with the design is how to set the values of the setup register.
+// (*This is a comment, not a verilator attribute ... )  Verilator needs to
+// know/set those values in order to work.  However, this design can also be
+// used as a stand-alone top level configuration file.  In this latter case,
+// the setup register needs to be set internal to the file.  Here, we use
+// OPT_STANDALONE to distinguish between the two.  If set, the file runs under
+// (* Another comment still ...) Verilator and we need to get i_setup from the
+// external environment.  If not, it must be set internally.
 //
-//`define OPT_STANDALONE
+`ifndef	VERILATOR
+`define OPT_STANDALONE
+`endif
 //
 module	helloworld(i_clk,
 `ifndef	OPT_STANDALONE
 			i_setup,
 `endif
 			o_uart_tx);
-	//
 	input		i_clk;
 	output	wire	o_uart_tx;
-`ifndef	OPT_STANDALONE
-	input	[30:0]	i_setup;
-`endif
 
-	// If i_setup isnt set up as an input parameter, it needs to be set.
-	// We do so here, to a setting appropriate to create a 115200 Baud
-	// comms system from a 100MHz clock.  This also sets us to an 8-bit
-	// data word, 1-stop bit, and no parity.
+	// Here we set i_setup to something appropriate to create a 115200 Baud
+	// UART system from a 100MHz clock.  This also sets us to an 8-bit data
+	// word, 1-stop bit, and no parity.  This will be overwritten by
+	// i_setup, but at least it gives us something to start with/from.
+	parameter	INITIAL_UART_SETUP = 31'd868;
+
+	// The i_setup wires are input when run under Verilator, but need to
+	// be set internally if this is going to run as a standalone top level
+	// test configuration.
 `ifdef	OPT_STANDALONE
 	wire	[30:0]	i_setup;
-	assign		i_setup = 31'd868;	// 115200 Baud, if clk @ 100MHz
+	assign	i_setup = INITIAL_UART_SETUP;
+`else
+	input	[30:0]	i_setup;
 `endif
 
 	reg	pwr_reset;

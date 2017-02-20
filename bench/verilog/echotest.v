@@ -57,13 +57,18 @@
 `define	OPT_DUMBECHO
 //
 //
-// Uncomment the next line if you want this program to work as a standalone
-// (not verilated) RTL "program" to test your UART.  You'll also need to set
-// your setup condition properly, though.  I recommend setting it to the 
-// ratio of your onboard clock to your desired baud rate.  For more information
-// about how to set this, please see the specification.
+// One issue with the design is how to set the values of the setup register.
+// (*This is a comment, not a verilator attribute ... )  Verilator needs to
+// know/set those values in order to work.  However, this design can also be
+// used as a stand-alone top level configuration file.  In this latter case,
+// the setup register needs to be set internal to the file.  Here, we use
+// OPT_STANDALONE to distinguish between the two.  If set, the file runs under
+// (* Another comment still ...) Verilator and we need to get i_setup from the
+// external environment.  If not, it must be set internally.
 //
+`ifndef	VERILATOR
 `define OPT_STANDALONE
+`endif
 //
 module	echotest(i_clk,
 `ifndef	OPT_STANDALONE
@@ -101,7 +106,7 @@ module	echotest(i_clk,
 	//
 	// This code only applies if OPT_DUMBECHO is not defined.
 `ifdef	OPT_STANDALONE
-	wire	[29:0]	i_setup;
+	wire	[30:0]	i_setup;
 	assign		i_setup = 31'd868;	// 115200 Baud, if clk @ 100MHz
 `endif
 
