@@ -56,7 +56,7 @@ module	linetest(i_clk,
 			i_uart_rx, o_uart_tx);
 	input		i_clk;
 `ifndef	OPT_STANDALONE
-	input	[29:0]	i_setup;
+	input	[30:0]	i_setup;
 `endif
 	input		i_uart_rx;
 	output	wire	o_uart_tx;
@@ -67,7 +67,7 @@ module	linetest(i_clk,
 	// data word, 1-stop bit, and no parity.
 `ifdef	OPT_STANDALONE
 	wire	[29:0]	i_setup;
-	assign		i_setup = 30'd868;	// 115200 Baud, if clk @ 100MHz
+	assign		i_setup = 31'd868;	// 115200 Baud, if clk @ 100MHz
 `endif
 
 	reg	[7:0]	buffer	[0:255];
@@ -194,8 +194,12 @@ module	linetest(i_clk,
 			tail <= 8'h00;
 		else if ((tx_stb)&&(!tx_busy))
 			tail <= tail + 8'h01;
-			
+
+	// Bypass any hardwaare flow control
+	wire	rts;
+	assign	rts = 1'b1;
+
 	txuart	transmitter(i_clk, pwr_reset, i_setup, tx_break,
-			tx_stb, tx_data, o_uart_tx, tx_busy);
+			tx_stb, tx_data, rts, o_uart_tx, tx_busy);
 
 endmodule

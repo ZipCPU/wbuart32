@@ -57,7 +57,7 @@ module	helloworld(i_clk,
 	input		i_clk;
 	output	wire	o_uart_tx;
 `ifndef	OPT_STANDALONE
-	input	[29:0]	i_setup;
+	input	[30:0]	i_setup;
 `endif
 
 	// If i_setup isnt set up as an input parameter, it needs to be set.
@@ -65,8 +65,8 @@ module	helloworld(i_clk,
 	// comms system from a 100MHz clock.  This also sets us to an 8-bit
 	// data word, 1-stop bit, and no parity.
 `ifdef	OPT_STANDALONE
-	wire	[29:0]	i_setup;
-	assign		i_setup = 30'd868;	// 115200 Baud, if clk @ 100MHz
+	wire	[30:0]	i_setup;
+	assign		i_setup = 31'd868;	// 115200 Baud, if clk @ 100MHz
 `endif
 
 	reg	pwr_reset;
@@ -121,7 +121,11 @@ module	helloworld(i_clk,
 		else if ((tx_stb)&&(!tx_busy)&&(tx_index==4'hf))
 			tx_stb <= 1'b0;
 
+	// Bypass any hardware flow control
+	wire	rts;
+	assign	rts = 1'b1;
+
 	txuart	transmitter(i_clk, pwr_reset, i_setup, tx_break,
-			tx_stb, tx_data, o_uart_tx, tx_busy);
+			tx_stb, tx_data, rts, o_uart_tx, tx_busy);
 
 endmodule

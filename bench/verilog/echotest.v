@@ -72,7 +72,7 @@ module	echotest(i_clk,
 			i_uart_rx, o_uart_tx);
 	input		i_clk;
 `ifndef	OPT_STANDALONE
-	input	[29:0]	i_setup;
+	input	[30:0]	i_setup;
 `endif
 	input		i_uart_rx;
 	output	wire	o_uart_tx;
@@ -102,7 +102,7 @@ module	echotest(i_clk,
 	// This code only applies if OPT_DUMBECHO is not defined.
 `ifdef	OPT_STANDALONE
 	wire	[29:0]	i_setup;
-	assign		i_setup = 30'd868;	// 115200 Baud, if clk @ 100MHz
+	assign		i_setup = 31'd868;	// 115200 Baud, if clk @ 100MHz
 `endif
 
 	// Create a reset line that will always be true on a power on reset
@@ -128,9 +128,13 @@ module	echotest(i_clk,
 	rxuart	receiver(i_clk, pwr_reset, i_setup, i_uart_rx, rx_stb, rx_data,
 			rx_break, rx_perr, rx_ferr, rx_ignored);
 
+	// Bypass any transmit hardware flow control.
+	wire	rts;
+	assign rts = 1'b1;
+
 	wire	tx_busy;
 	txuart	transmitter(i_clk, pwr_reset, i_setup, rx_break,
-			rx_stb, rx_data, o_uart_tx, tx_busy);
+			rx_stb, rx_data, rts, o_uart_tx, tx_busy);
 
 `endif
 
