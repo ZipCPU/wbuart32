@@ -45,11 +45,14 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-// Uncomment the next line if you want this program to work as a standalone
-// (not verilated) RTL "program" to test your UART.  You'll also need to set
-// your i_setup condition properly, though (below).  I recommend setting it to 
-// the ratio of your onboard clock to your desired baud rate.  For more
-// information about how to set this, please see the specification.
+// One issue with the design is how to set the values of the setup register.
+// (*This is a comment, not a verilator attribute ... )  Verilator needs to
+// know/set those values in order to work.  However, this design can also be
+// used as a stand-alone top level configuration file.  In this latter case,
+// the setup register needs to be set internal to the file.  Here, we use
+// OPT_STANDALONE to distinguish between the two.  If set, the file runs under
+// (* Another comment still ...) Verilator and we need to get i_setup from the
+// external environment.  If not, it must be set internally.
 //
 `ifndef	VERILATOR
 `define OPT_STANDALONE
@@ -67,16 +70,16 @@ module	speechfifo(i_clk,
 	// UART system from a 100MHz clock.  This also sets us to an 8-bit data
 	// word, 1-stop bit, and no parity.  This will be overwritten by
 	// i_setup, but at least it gives us something to start with/from.
-	parameter	INITIAL_UART_SETUP = 30'd868;
+	parameter	INITIAL_UART_SETUP = 31'd868;
 
 	// The i_setup wires are input when run under Verilator, but need to
 	// be set internally if this is going to run as a standalone top level
 	// test configuration.
 `ifdef	OPT_STANDALONE
-	wire	[29:0]	i_setup;
+	wire	[30:0]	i_setup;
 	assign	i_setup = INITIAL_UART_SETUP;
 `else
-	input	[29:0]	i_setup;
+	input	[30:0]	i_setup;
 `endif
 
 	reg		restart;
@@ -189,7 +192,7 @@ module	speechfifo(i_clk,
 			// serial port configuration parameters.  Ideally,
 			// we'd only set this once.  But rather than complicate
 			// the logic, we set it everytime we start over.
-			wb_data <= { 2'b00, i_setup };
+			wb_data <= { 1'b0, i_setup };
 		else if ((wb_stb)&&(!uart_stall))
 			// Then, if the last thing was received over the bus,
 			// we move to the next data item.
@@ -237,15 +240,10 @@ module	speechfifo(i_clk,
 			// Stop transmitting when we get to the end of our
 			// message.
 			wb_stb <= 1'b0;
-		else if (tx_int)
-			// If we aren't at the end of the message, and tx_int
-			// tells us the FIFO is empty, then start writing into
-			// the FIFO>
-			wb_stb <= 1'b1;
 		else if (txfifo_int)
-			// If we are writing into the FIFO, and it's less than
-			// half full (i.e. txfifo_int is true) then keep going.
-			wb_stb <= wb_stb;
+			// If the FIFO is less than half full, then write to
+			// it.
+			wb_stb <= 1'b1;
 		else
 			// But once the FIFO gets to half full, stop.
 			wb_stb <= 1'b0;
@@ -254,13 +252,23 @@ module	speechfifo(i_clk,
 	// here as ignored.
 	wire	ignored_rx_int, ignored_rxfifo_int;
 
+	// The WBUART can handle hardware flow control signals.  This test,
+	// however, cannot.  The reason?  Simply just to keep things simple.
+	// If you want to add hardware flow control to your design, simply
+	// make rts an input to this module.
+	//
+	// Since this is an output only module demonstrator, what would be the
+	// cts output is unused.
+	wire	rts, cts;
+	assign	rts = 1'b1;
+
 	// Finally--the unit under test--now that we've set up all the wires
 	// to run/test it.
 	wbuart	#(INITIAL_UART_SETUP)
 		wbuarti(i_clk, pwr_reset,
 			wb_stb, wb_stb, 1'b1, wb_addr, wb_data,
 			uart_ack, uart_stall, uart_data,
-			1'b1, o_uart_tx,
+			1'b1, o_uart_tx, rts, cts,
 			ignored_rx_int, tx_int,
 			ignored_rxfifo_int, txfifo_int);
 
