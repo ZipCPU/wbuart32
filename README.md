@@ -18,7 +18,7 @@ things from the very first, to write_ ... my own UART core.
 
 At one time, the biggest drawback to the files in these directories was that
 there wasn't a version of this UART interface containing a FIFO.  Well, no
-more.  Now there is a [wbuart.v](master/rtl/wbuart.v) file that can be
+more.  Now there is a [wbuart.v](rtl/wbuart.v) file that can be
 integrated into a wishbone/B4/pipeline bus.  As mentioned above, this module
 contains a FIFO with a parameterized length that can extend up to 1023 entries. 
 Indeed, recent changes have even added in optional hardware flow control, should
