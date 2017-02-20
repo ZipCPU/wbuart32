@@ -46,7 +46,7 @@
 \title{Specification}
 \author{Dan Gisselquist, Ph.D.}
 \email{dgisselq (at) ieee.org}
-\revision{Rev.~0.1}
+\revision{Rev.~1.0}
 \begin{document}
 \pagestyle{gqtekspecplain}
 \titlepage
@@ -67,6 +67,7 @@ You should have received a copy of the GNU General Public License along
 with this program.  If not, see \texttt{http://www.gnu.org/licenses/} for a copy.
 \end{license}
 \begin{revisionhistory}
+1.0 & 2/20/2017 & D. Gisselquist & Added Hardware Flow Control\\\hline
 0.2 & 1/03/2017 & D. Gisselquist & Added test-bench information\\\hline
 0.1 & 8/26/2016 & D. Gisselquist & Initial Draft Specification\\\hline
 \end{revisionhistory}
@@ -117,7 +118,7 @@ terminal or other port.  Indeed, this may even be sufficient to connect a
 CPU, capable of running Linux, to a terminal to verify that yes it can truly
 run Linux--all within Verilator.
 
-As a final addition, there are three files in the test bench section which can
+As a final addition, there are four files in the test bench section which can
 be used as top--level design files to prove whether or not the serial port on
 a given circuit board works.
 
@@ -126,17 +127,18 @@ a given circuit board works.
 The HDL portion of the core itself consists of four basic files: {\tt rxuart.v},
 {\tt txuart.v}, {\tt ufifo.v} and {\tt wbuart.v}.  These are, respectively, the
 receive UART code, the transmit UART code, a fairly generic FIFO, and a fully
-wishbone compliant UART peripheral.  This latter files demonstrates one example
-of how the receiver, transmitter, and FIFOs may be connected to a Wishbone bus.
-A fifth file, {\tt wbuart-insert.v}, demonstrates how the {\tt rxuart.v} and
-{\tt txuart.v} files may be included into a module implementing a simpler
-interface.
+wishbone compliant UART peripheral.  This latter file demonstrates one example
+of how the receiver, transmitter, and a pair of FIFOs may be connected to a
+Wishbone bus.  A fifth file, {\tt wbuart-insert.v}, demonstrates how the
+{\tt rxuart.v} and {\tt txuart.v} files may be included into a module
+implementing a simpler wishbone interface without the FIFO.
 
 Each of the core files, {\tt rxuart.v} and {\tt txuart.v}, are fully capable.
-They each accept a 29--bit setup value specifying baud rate, the number of bits
-per byte (between 5 and 8), whether or not parity is used, whether that parity
-is even, odd, or fixed mark or fixed space.  This setup register will be
-discussed further in Chap.\ref{ch:registers}.
+They each accept a 30--bit setup value specifying baud rate, the number of bits
+per byte (between 5 and 8), whether hardware flow control is off, or whether or
+not parity is used, and if so whether that parity is even, odd, or fixed mark
+or fixed space.  This setup register will be discussed further in
+Chap.\ref{ch:registers}.
 
 A further note on the {\tt rxuart.v} module is in order.  This module double
 latches the input, in the proper two buffer fashion to avoid problems with
@@ -164,14 +166,14 @@ synthesized becomes limited.
 
 Connecting to either {\tt txuart.v} or {\tt rxuart.v} is quite simple.  Both
 files have a data port and a strobe.  To transmit, set the data and strobe
-lines.  Drop the strobe line as soon as the strobe is asserted and the busy line
-is not. 
+lines.  Drop the strobe line on the clock after the busy line was low.
 Likewise, to connect to the {\tt rxuart.v} port, there is a data
 and a strobe.  This time, though, these two wires are outputs of the receive
 module as opposed to inputs.
 When the strobe is high, the data is valid.  It will only be high for one
 clock period.  If you wish to connect this output to a bus, a register will be
-needed to hold the strobe high until the data is read.  Also, while the strobe
+needed to hold the strobe high until the data is read, as in
+{\tt wbuart-insert.v}.  Also, while the strobe
 is high, the {\tt o\_frame\_err} will indicate whether or not there was a 
 framing error (i.e., no stop bit), and {\tt o\_parity\_err} will indicate
 whether or not the parity matched.  Finally, the {\tt o\_break} line will
@@ -187,8 +189,9 @@ An simple example of how to put this configuration together is found in
 will have only the lower eight bits set if the data is valid, higher bits will
 be set upon error conditions, and cleared automatically upon the next byte read.
 In a similar fashion, the {\tt tx\_data} register can be written to with a byte
-in order to transmit that byte.  Writing bit nine will place the transmitter
-into a ``break'' condition, only cleared by writing a zero to that bit later.
+in order to transmit that byte.  Writing bit ten will place the transmitter
+into a ``break'' condition, which will only be cleared by writing a zero to
+that bit later.
 Reading from the {\tt tx\_data} register can also be used to determine if the
 transmitter is busy (via polling), whether it is currently in a break condition,
 or even what bit is currently being placed to the output port.
@@ -213,14 +216,16 @@ directory.  {\tt helloworld.v} presents an example of a simple UART transmitter
 sending the ``Hello, World {\textbackslash}r{\textbackslash}n'' message over
 and over again.  This example
 uses only the {\tt txuart.v} module, and can be simulated in Verilator.
-A second test file, {\tt linetest.v}, works by waiting for a line of data to be
-received, after which it parrots that line back to the terminal.  This tests
-both {\tt txuart.v} and {\tt rxuart.v}.  A third test file, {\tt speechfifo.v}
-tests both the wishbone interface as well as the FIFO, by filling the UART,
-10~samples at a time, with text from Abraham Lincoln's Gettysburg address.
-All three of these files have an internal option to define
-{\tt OPT\_STANDALONE}.  If and when defined, they may be used as top--level
-files as part of a UART test.
+A second test file, {\tt echotest.v}, works by echoing every received character
+to the transmit port.
+This tests both {\tt txuart.v} and {\tt rxuart.v}. 
+A third test file, {\tt linetest.v}, works by waiting for a line of data to be
+received, after which it parrots that line back to the terminal. 
+A fourth test file, {\tt speechfifo.v} tests both the wishbone interface as
+well as the FIFO, by filling the UART, 10~samples at a time, with text from
+Abraham Lincoln's Gettysburg address.
+All three of these example files may be used as stand-alone top--level design
+files to verify your own UART hardware functionality.
 
 \chapter{Operation}\label{ch:ops}
 
@@ -229,16 +234,19 @@ files as part of a UART test.
 % described.
 %
 
-To use the core, a couple of steps are required.  First, wire it up.  The
+To use the core, a couple of steps are required.  First, wire it up.  This
+includes wiring the {\tt i\_uart} and {\tt o\_uart} ports, as well as any
+{\tt i\_rts} and/or {\tt o\_cts} hardware flow control.  The
 {\tt rxuart.v} and {\tt txuart.v} files may be wired up for use individually,
-or using an example such as {\tt wbuart-insert.v}.  Alternatively, the 
-{\tt wbuart.v} file may be connected to a straight 32--bit wishbone bus.
+or as part of a large module such as the example in{\tt wbuart-insert.v}. 
+Alternatively, the {\tt wbuart.v} file may be connected to a straight 32--bit
+wishbone bus.
 Second, set the UART configuration register.  This is ideally set by setting
 the {\tt INITIAL\_SETUP} parameter of {\tt rxuart}, {\tt txuart} or even
-{\tt wbuart.v}  Alternatively, you can write to the setup register at a later
-time, as is done with the {\tt speechfifo.v} bench test.
+{\tt wbuart}  Alternatively, you can write to the setup register at a later
+time, as is done within the {\tt speechfifo.v} bench test.
 
-From a simulation standpoint, it will also need to be ``wired'' up in your
+From a simulation standpoint, it will also need to be ``wired'' up inside your
 C++ main Verilator file.  Somewhere, internal to the top--level Verilator
 C++ simulation file, you'll want to have some setup lines similar to,
 \begin{tabbing}
@@ -318,7 +326,8 @@ is shown in Fig.\ref{fig:SETUP}.
 \begin{figure}\begin{center}
 \begin{bytefield}[endianness=big]{32}
 \bitheader{0-31}\\
-\bitbox{2}{00}
+\bitbox{1}{0}
+\bitbox{1}{H}
 \bitbox{2}{N}
 \bitbox{1}{S}
 \bitbox{1}{P}
@@ -329,12 +338,12 @@ is shown in Fig.\ref{fig:SETUP}.
 \caption{SETUP Register fields}\label{fig:SETUP}
 \end{center}\end{figure}
 It is designed so that, for any 8N1 protocol (eight data bits, no parity, one
-stop bit), all of the upper bits will be set to zero so that only the number of
-clocks per baud interval needs to be set.  The top two bits are unused, making
-this a 30--bit number.\footnote{The top two bits are ideally suited for adding
-in a user configurable hardware flow control: one for flow control in use, zero
-otherwise, but this is only a future upgrade possibility as of this writing.} 
-The other fields are: $N$ sets the number of bits per word.  A value of zero
+stop bit, hardware flow control on), all of the upper bits will be set to zero
+so that only the number of
+clocks per baud interval needs to be set. 
+The top bit is unused, making this a 31--bit number.
+The other fields are: $H$ which, when set, turns off any hardware flow
+control.  $N$ sets the number of bits per word.  A value of zero
 corresponds to 8--bit words, a value of one to seven bit words, and so forth up
 to a value of three for five bit words.  $S$ determines the number of stop
 bits.  Set this to one for two stop bits, or leave it at zero for a single
@@ -353,7 +362,7 @@ P&F&T&Setting \\\hline\hline
 \end{center}\end{table}
 
 The final portion of this register is the baud {\tt CLKS}.  This is the number
-of ticks of your ssytem clock per baud interval,
+of ticks of your system clock per baud interval,
 \begin{eqnarray*}
 {\tt CLKS} &=& \frac{f_{\mbox{\tiny SYS}}}{f_{\mbox{\tiny BAUD}}}.
 \end{eqnarray*}
@@ -405,14 +414,21 @@ We'll discuss each of these bits individually.
 
 The {\tt LGLN} field indicates the log base two of the FIFO length.  Hence an
 {\tt LGLN} field of four would indicate a FIFO length of sixteen values.
-The FIFO fill indicates the current level of fill.  The $H$ bit will be true
-if the FIFO is half full, and the $Z$ bit will be true if the FIFO is non-empty.
+The FIFO fill for the transmitter indicates the number of available spaces
+within the transmit FIFO, while the FIFO fill in the receiver indicates the
+current number of spaces within the FIFO having valid data.  The $H$ bit will
+be true if the high order FIFO fill bit is set.
+Finally, the $Z$ bit will be true for the transmitter if there is at least one
+open space in the FIFO, and true in the receiver if there is at least one value
+needing to be read.
 
 The $H$ and $Z$ bits also mirror the interrupt bits generated by {\tt wbuart.v}.
 Interrupts will be generated any time the FIFO is half full (on receive), or
-less than half full (on transmit). The same logic applies for the $Z$ bit.
+less than half full (on transmit). The same logic applies for the $Z$ bit.  An
+interrupt will be generated any time the FIFO in non-empty (on receive), or
+not full (on transmit).
 
-Writes to this register are quietly ignored.
+Writes to this FIFO status register are quietly ignored.
 
 \section{RX\_DATA Register}
 Fig.~\ref{fig:RXDATA}
@@ -446,7 +462,7 @@ zero there is a word ready to be received without error.
 
 The $E$ bit is an error bit.  When set, it indicates that the FIFO has
 overflowed sometime since the last reset.  This bit is also a reset bit.
-In other words, writing a {\tt 1'b0} to this bit will command a receive
+In other words, writing a {\tt 1'b1} to this bit will command a receive
 reset: clearing the FIFO, and waiting for the line to be idle before receiving
 another byte.  This bit is not implemented in {\tt wbuart-insert.v}, but
 exists in the {\tt wbuart.v} implementation.
@@ -456,7 +472,8 @@ Fig.~\ref{fig:TXDATA}
 \begin{figure}\begin{center}
 \begin{bytefield}[endianness=big]{32}
 \bitheader{0-31}\\
-\bitbox[lrt]{17}{17'h00}
+\bitbox[lrt]{16}{16'h00}
+\bitbox{1}{R}
 \bitbox{1}{H}
 \bitbox{1}{Z}
 \bitbox{1}{E}
@@ -481,16 +498,18 @@ data line is high or low, the $O$ field indicates the same for the transmit
 line.  These aren't particularly useful or valuable, but the $C$ bit doesn't
 fit in the receive data register since it would violate the error condition
 detector.  These two bits are thrown in here for whatever useful purpose one
-might find.  The $B$ field, when set, sends a break condition down the wire. 
+might find.  The $B$ field, when set, transmits a break condition. 
 Further, writes to the TXDATA register while in a break condition and with the
 $B$ field clear, will clear the transmitter from any break condition without
 transmitting anything.  The $S$ field is similar to the RXDATA strobe register.
 It is a read--only bit that will be true any time the transmitter is busy.
-It will be clear only when the transmitter is idle.
+It will be clear only when the transmitter is idle. 
+Finally, the upper $R$ bit at the top of the register is the instantaneous
+value of the received ready-to-send (RTS) value.
 
 The final three bits, $H$, $Z$, and $E$, are present only in {\tt wbuart.v}.
 These bits indicate $H$ if the FIFO is at least half full, $Z$ if the FIFO is
-empty, and $E$ if the FIFO has experienced an overflow condition since the
+not full, and $E$ if the FIFO has experienced an overflow condition since the
 last reset. Writing a {\tt 1'b1} to the $E$ bit will reset the transmit FIFO,
 both clearing any error indication in the FIFO as well as clearing the FIFO
 itself.
@@ -552,7 +571,8 @@ wishbone compliant, and so it is included here.  It references the connections
 used in {\tt wbuart.v} as well as those exemplified by {\tt wbuart-insert.v}. 
 The big thing to notice is that this core acts as a wishbone slave, and that
 all accesses to the core registers are 32--bit reads and writes to this
-interface---not the 8--bit reads or writes that might otherwise be expected.
+interface---not the 8--bit reads or writes that might be expected from any
+other 8'bit serial interface.
 
 What this table doesn't show is that all accesses to the port take a single
 clock for {\tt wbuart-insert.v}, or two clocks for {\tt wbuart.v}.  That is, if
@@ -578,12 +598,16 @@ Verilator, they need to be connected inside your Verilator test bench, as in:
 \> {\tt tb->i\_uart\_rx} {\tt = } {\tt uartsim(tb->o\_uart\_tx);}
 \end{tabbing}
 
+For those interested in hardware flow control, the core also offers an
+{\tt i\_rts} input to control the flow out of our transmitter, and an
+{\tt o\_cts} output when the receiver is full.
+
 A more detailed discussion of the connections associated with these modules
 can begin with Tbl.~\ref{tbl:rxports},
 \begin{table}\begin{center}\begin{portlist}
 {\tt i\_clk}	& 1 & Input & The system clock \\\hline
 {\tt i\_reset}	& 1 & Input & A positive, synchronous reset \\\hline
-{\tt i\_setup}	& 30 & Input & The 30--bit setup register \\\hline
+{\tt i\_setup}	& 31 & Input & The 31--bit setup register \\\hline
 {\tt i\_uart}	& 1 & Input & The input wire from the outside world. \\\hline
 {\tt o\_wr}	& 1 & Output & True if a word was received.  At this time,
 		{\tt o\_data}, {\tt o\_break}, {\tt o\_parity\_err}, and
@@ -599,11 +623,12 @@ detailing the I/O ports of the UART receiver, Tbl.~\ref{tbl:txports},
 \begin{table}\begin{center}\begin{portlist}
 {\tt i\_clk}	& 1 & Input & The system clock \\\hline
 {\tt i\_reset}	& 1 & Input & A positive, synchronous reset \\\hline
-{\tt i\_setup}	& 30 & Input & The 30--bit setup register \\\hline
+{\tt i\_setup}	& 31 & Input & The 31--bit setup register \\\hline
 {\tt i\_break}	& 1 & Input & Set to true to place the transmit channel into a break condition\\\hline
 {\tt i\_wr}	& 1 & Input & An input strobe.  Set to one when you wish to transmit data, clear once it has been accepted\\\hline
 {\tt i\_data}	& 8 & Input & The data to be transmitted, ignored unless
 		{\tt (i\_wr)\&\&(!o\_busy)} \\\hline
+{\tt i\_rts}	& 1 & Input & A hardware flow control wire, true if the receiver is ready to receive\\\hline
 {\tt o\_uart}	& 1 & Output & The wire to be connected to the external port\\\hline
 {\tt o\_busy}	& 1 & Output & True if the transmitter is busy, false if it will receive data\\\hline
 \end{portlist}\caption{TXUART port list}\label{tbl:txports}
@@ -613,8 +638,10 @@ detailing the I/O ports of the UART transmitter, and Tbl.~\ref{tbl:wbports}
 \rowcolor[gray]{0.85} Port & W & Direction & Description \\\hline\hline
 {\tt i\_uart\_rx}& 1 & Input & The receive wire coming from the external port\\\hline
 {\tt o\_uart\_tx}& 1 & Output & The transmit wire to be connected to the external port\\\hline
+{\tt i\_rts}& 1 & Input  & The hardware flow control {\tt ready-to-send} (i.e. receive) input for the transmitter\\\hline
+{\tt o\_cts}& 1 & Output & The hardware flow control {\tt clear-to-send} output\\\hline
 {\tt o\_uart\_rx\_int}	& 1 & Output & True if a byte may be read from the receiver\\\hline
-{\tt o\_uart\_tx\_int}	& 1 & Output & True if the transmitter is idle\\\hline
+{\tt o\_uart\_tx\_int}	& 1 & Output & True if a byte may be sent to the transmitter\\\hline
 {\tt o\_uart\_rxfifo\_int}&1& Output & True if the receive FIFO is half full\\\hline
 {\tt o\_uart\_txfifo\_int}&1& Output & True if the transmit FIFO is half empty\\\hline
 \end{tabular}\caption{WBUART port list}\label{tbl:wbports}
