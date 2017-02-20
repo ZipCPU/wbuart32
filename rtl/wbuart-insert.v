@@ -50,12 +50,12 @@
 	// it to CLKRATE / BAUDRATE, to give me 8N1 performance.  4MB is useful
 	// to me, so 100MHz / 4M = 25 could be the setup.  You can also use
 	// 200MHz / 4MB = 50 ... it all depends upon your clock.
-`define	UART_SETUP	30'd25
-	reg	[29:0]	uart_setup;
+`define	UART_SETUP	31'd25
+	reg	[30:0]	uart_setup;
 	initial	uart_setup = `UART_SETUP;
 	always @(posedge i_clk)
 		if ((i_wb_stb)&&(i_wb_addr == `UART_SETUP_ADDR))
-			uart_setup[29:0] <= i_wb_data[29:0];
+			uart_setup[30:0] <= i_wb_data[30:0];
 
 	//
 	// First the UART receiver
@@ -83,42 +83,52 @@
 			r_rx_data[ 9] <= (rx_perr) && (!i_wb_data[ 9]);
 		end
 	always @(posedge i_clk)
-		if(((i_wb_stb)&&(~i_wb_we)&&(i_wb_addr == `UART_RX_ADDR))
+		if(((i_wb_stb)&&(!i_wb_we)&&(i_wb_addr == `UART_RX_ADDR))
 				||(rx_stb))
 			r_rx_data[8] <= !rx_stb;
 	assign	o_cts = !r_rx_data[8];
 	assign	rx_data = { 20'h00, r_rx_data };
 	assign	rx_int = !r_rx_data[8];
 
+	// Transmit hardware flow control, the rts line
+	wire	rts;
+	// Set this rts value to one if you aren't ever going to use H/W flow
+	// control, otherwise set it to the value coming in from the external
+	// i_rts pin.
+	assign	rts = i_rts;
+
 	//
 	// Then the UART transmitter
 	//
+	//
+	//
+	// Now onto the transmitter itself
 	wire	tx_busy;
 	reg	[7:0]	r_tx_data;
 	reg		r_tx_stb, r_tx_break;
 	wire	[31:0]	tx_data;
 	txuart	#(UART_SETUP) tx(i_clk, 1'b0, uart_setup,
 			r_tx_break, r_tx_stb, r_tx_data,
-			o_tx, tx_busy);
+			rts, o_tx, tx_busy);
 	always @(posedge i_clk)
 		if ((i_wb_stb)&&(i_wb_addr == 5'h0f))
 		begin
-			r_tx_stb <= (!r_tx_break)&&(!i_wb_data[8]);
+			r_tx_stb  <= (!r_tx_break)&&(!i_wb_data[8]);
 			r_tx_data <= i_wb_data[7:0];
 			r_tx_break<= i_wb_data[9];
-		end else if (~tx_busy)
+		end else if (!tx_busy)
 		begin
 			r_tx_stb <= 1'b0;
 			r_tx_data <= 8'h0;
 		end
-	assign	tx_data = { 20'h00,
+	assign	tx_data = { 16'h00, rts, 3'h0,
 		ck_uart, o_tx, r_tx_break, tx_busy,
 		r_tx_data };
 	assign	tx_int = ~tx_busy;
 
 	always @(posedge i_clk)
 		case(i_wb_addr)
-		`UART_SETUP_ADDR: o_wb_data <= { 2'b00, uart_setup };
+		`UART_SETUP_ADDR: o_wb_data <= { 1'b0, uart_setup };
 		`UART_RX_ADDR   : o_wb_data <= rx_data;
 		`UART_TX_ADDR   : o_wb_data <= tx_data;
 		// 

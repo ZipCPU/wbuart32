@@ -21,9 +21,16 @@
 //	Now for the setup register.  The register is 32 bits, so that this
 //	UART may be set up over a 32-bit bus.
 //
+//	i_setup[30]	Set this to zero to use hardware flow control, and to
+//		one to ignore hardware flow control.  Only works if the hardware
+//		flow control has been properly wired.
+//
+//		If you don't want hardware flow control, fix the i_rts bit to
+//		1'b1, and let the synthesys tools optimize out the logic.
+//
 //	i_setup[29:28]	Indicates the number of data bits per word.  This will
-//	either be 2'b00 for an 8-bit word, 2'b01 for a 7-bit word, 2'b10
-//	for a six bit word, or 2'b11 for a five bit word.
+//		either be 2'b00 for an 8-bit word, 2'b01 for a 7-bit word, 2'b10
+//		for a six bit word, or 2'b11 for a five bit word.
 //
 //	i_setup[27]	Indicates whether or not to use one or two stop bits.
 //		Set this to one to expect two stop bits, zero for one.
@@ -104,34 +111,67 @@
 `define	TXU_IDLE	4'hf
 //
 //
-module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,o_uart_tx, o_busy);
-	parameter	INITIAL_SETUP = 30'd868;
+module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
+		i_rts, o_uart_tx, o_busy);
+	parameter	[30:0]	INITIAL_SETUP = 31'd868;
 	input			i_clk, i_reset;
-	input		[29:0]	i_setup;
+	input		[30:0]	i_setup;
 	input			i_break;
 	input			i_wr;
 	input		[7:0]	i_data;
+	// Hardware flow control Ready-To-Send bit.  Set this to one to use
+	// the core without flow control.  (A more appropriate name would be
+	// the Ready-To-Receive bit ...)
+	input			i_rts;
+	// And the UART input line itself
 	output	reg		o_uart_tx;
+	// A line to tell others when we are ready to accept data.  If
+	// (i_wr)&&(!o_busy) is ever true, then the core has accepted a byte
+	// for transmission.
 	output	wire		o_busy;
 
 	wire	[27:0]	clocks_per_baud, break_condition;
 	wire	[1:0]	data_bits;
 	wire		use_parity, parity_even, dblstop, fixd_parity,
-			fixdp_value;
-	reg	[29:0]	r_setup;
+			fixdp_value, hw_flow_control;
+	reg	[30:0]	r_setup;
 	assign	clocks_per_baud = { 4'h0, r_setup[23:0] };
 	assign	break_condition = { r_setup[23:0], 4'h0 };
-	assign	data_bits   = r_setup[29:28];
-	assign	dblstop     = r_setup[27];
-	assign	use_parity  = r_setup[26];
-	assign	fixd_parity = r_setup[25];
-	assign	parity_even = r_setup[24];
-	assign	fixdp_value = r_setup[24];
+	assign	hw_flow_control = !r_setup[30];
+	assign	data_bits       =  r_setup[29:28];
+	assign	dblstop         =  r_setup[27];
+	assign	use_parity      =  r_setup[26];
+	assign	fixd_parity     =  r_setup[25];
+	assign	parity_even     =  r_setup[24];
+	assign	fixdp_value     =  r_setup[24];
 
 	reg	[27:0]	baud_counter;
 	reg	[3:0]	state;
 	reg	[7:0]	lcl_data;
 	reg		calc_parity, r_busy, zero_baud_counter;
+
+
+	// First step ... handle any hardware flow control, if so enabled.
+	//
+	// Clock in the flow control data, two clocks to avoid metastability
+	// Default to using hardware flow control (uart_setup[30]==0 to use it).
+	// Set this high order bit off if you do not wish to use it.
+	reg	q_rts, qq_rts, ck_rts;
+	// While we might wish to give initial values to q_rts and ck_rts,
+	// 1) it's not required since the transmitter starts in a long wait
+	// state, and 2) doing so will prevent the synthesizer from optimizing
+	// this pin in the case it is hard set to 1'b1 external to this
+	// peripheral.
+	//
+	// initial	q_rts  = 1'b0;
+	// initial	qq_rts  = 1'b0;
+	// initial	ck_rts = 1'b0;
+	always	@(posedge i_clk)
+		q_rts <= i_rts;
+	always	@(posedge i_clk)
+		qq_rts <= q_rts;
+	always	@(posedge i_clk)
+		ck_rts <= (qq_rts)&&(hw_flow_control);
 
 	initial	o_uart_tx = 1'b1;
 	initial	r_busy = 1'b1;
@@ -168,7 +208,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,o_uart_tx, o_busy);
 				2'b11: state <= `TXU_BIT_THREE;
 				endcase
 			end else begin // Stay in idle
-				r_busy <= 0;
+				r_busy <= !ck_rts;
 			end
 		end else begin
 			// One clock tick in each of these states ...
@@ -215,7 +255,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,o_uart_tx, o_busy);
 	// broken out up top, and indicate what 1) our baud rate is, 2) our
 	// number of stop bits, 3) what type of parity we are using, and 4)
 	// the size of our data word.
-	initial	r_setup = INITIAL_SETUP;
+	initial	r_setup = INITIAL_SETUP[30:0];
 	always @(posedge i_clk)
 		if (state == `TXU_IDLE)
 			r_setup <= i_setup;

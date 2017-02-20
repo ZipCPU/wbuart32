@@ -35,16 +35,16 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
-		o_empty_n, o_half_full, o_status, o_err);
-	parameter	BW=8, LGFLEN=4;
+module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_err);
+	parameter	BW=8;	// Byte/data width
+	parameter [3:0]	LGFLEN=4;
+	parameter [0:0]	RXFIFO=0;
 	input			i_clk, i_rst;
 	input			i_wr;
 	input	[(BW-1):0]	i_data;
+	output	wire		o_empty_n;	// True if something is in FIFO
 	input			i_rd;
 	output	wire [(BW-1):0]	o_data;
-	output	reg		o_empty_n;
-	output	wire		o_half_full;
 	output	wire	[15:0]	o_status;
 	output	wire		o_err;
 
@@ -103,7 +103,7 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 	//	5	1	2		fifo[2]
 	//	6	0	3		fifo[3]
 	//	7	0	3		fifo[3]
-	reg	will_underflow, r_unfl;
+	reg	will_underflow;
 	initial	will_underflow = 1'b1;
 	always @(posedge i_clk)
 		if (i_rst)
@@ -115,14 +115,20 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 		else
 			will_underflow <= (r_last == r_first);
 
-	initial	r_unfl = 1'b0;
+	//
+	// Don't report FIFO underflow errors.  These'll be caught elsewhere
+	// in the system, and the logic below makes it hard to reset them.
+	// We'll still report FIFO overflow, however.
+	//
+	// reg		r_unfl;
+	// initial	r_unfl = 1'b0;
 	initial	r_last = 0;
 	always @(posedge i_clk)
 		if (i_rst)
 		begin
 			r_last <= 0;
 			r_next <= { {(LGFLEN-1){1'b0}}, 1'b1 };
-			r_unfl <= 1'b0;
+			// r_unfl <= 1'b0;
 		end else if (i_rd)
 		begin
 			if ((i_wr)||(!will_underflow)) // (r_first != r_last)
@@ -133,8 +139,8 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 				// Need to be prepared for a possible two
 				// reads in quick succession
 				// o_data <= fifo[r_last+1];
-			end else
-				r_unfl <= 1'b1;
+			end
+			// else r_unfl <= 1'b1;
 		end
 
 	reg	[7:0]	fifo_here, fifo_next, r_data;
@@ -161,32 +167,89 @@ module ufifo(i_clk, i_rst, i_wr, i_data, i_rd, o_data,
 	// wire	[(LGFLEN-1):0]	current_fill;
 	// assign	current_fill = (r_first-r_last);
 
+	reg	r_empty_n;
+	initial	r_empty_n = 1'b0;
 	always @(posedge i_clk)
 		if (i_rst)
-			o_empty_n <= 1'b0;
+			r_empty_n <= 1'b0;
 		else case({i_wr, i_rd})
-			2'b00: o_empty_n <= (r_first != r_last);
-			2'b11: o_empty_n <= (r_first != r_last);
-			2'b10: o_empty_n <= 1'b1;
-			2'b01: o_empty_n <= (r_first != w_last_plus_one);
+			2'b00: r_empty_n <= (r_first != r_last);
+			2'b11: r_empty_n <= (r_first != r_last);
+			2'b10: r_empty_n <= 1'b1;
+			2'b01: r_empty_n <= (r_first != w_last_plus_one);
 		endcase
 
-	reg	[(LGFLEN-1):0]	r_fill;
-	always @(posedge i_clk)
-		if (i_rst)
-			r_fill <= 0;
-		else if ((i_rd)&&(!i_wr))
-			r_fill <= r_first - r_next;
-		else if ((!i_rd)&&(i_wr))
-			r_fill <= r_first - r_last + 1'b1;
-		else
-			r_fill <= r_first - r_last;
-	assign	o_half_full = r_fill[(LGFLEN-1)];
+	wire	w_full_n;
+	assign	w_full_n = will_overflow;
 
-	assign o_err = (r_ovfl) || (r_unfl);
+	//
+	// If this is a receive FIFO, the FIFO count that matters is the number
+	// of values yet to be read.  If instead this is a transmit FIFO, then 
+	// the FIFO count that matters is the number of empty positions that
+	// can still be filled before the FIFO is full.
+	//
+	// Adjust for these differences here.
+	reg	[(LGFLEN-1):0]	r_fill;
+	generate if (RXFIFO!=0) begin
+		// Calculate the number of elements in our FIFO
+		//
+		// Although used for receive, this is actually the more generic
+		// answer--should you wish to use the FIFO in another context.
+		always @(posedge i_clk)
+			if (i_rst)
+				r_fill <= 0;
+			else case({i_wr, i_rd})
+			2'b01:   r_fill <= r_first - r_next;
+			2'b10:   r_fill <= r_first - r_last + 1'b1;
+			default: r_fill <= r_first - r_last;
+			endcase
+	end else begin
+		// Calculate the number of elements that are empty and can be
+		// filled within our FIFO
+		always @(posedge i_clk)
+			if (i_rst)
+				r_fill <= { (LGFLEN){1'b1} };
+			else case({i_wr, i_rd})
+			2'b01:   r_fill <= r_last - r_first;
+			2'b10:   r_fill <= r_last - w_first_plus_two;
+			default: r_fill <= r_last - w_first_plus_one;
+			endcase
+	end endgenerate
+
+	// We don't report underflow errors.  These
+	assign o_err = (r_ovfl); //  || (r_unfl);
 
 	wire	[3:0]	lglen;
 	assign lglen = LGFLEN;
-	assign	o_status = { lglen, {(16-2-4-LGFLEN){1'b0}}, r_fill, o_half_full, o_empty_n };
+
+	wire	[9:0]	w_fill;
+	assign	w_fill[(LGFLEN-1):0] = r_fill;
+	generate if (LGFLEN != 10)
+		assign w_fill[9:(LGFLEN-1)] = 0;
+	endgenerate
+
+	wire	w_half_full;
+	assign	w_half_full = r_fill[(LGFLEN-1)];
+
+	assign	o_status = {
+		// Our status includes a 4'bit nibble telling anyone reading
+		// this the size of our FIFO.  The size is then given by
+		// 2^(this value).  Hence a 4'h4 in this position means that the
+		// FIFO has 2^4 or 16 values within it.
+		lglen,
+		// The FIFO fill--for a receive FIFO the number of elements
+		// left to be read, and for a transmit FIFO the number of
+		// empty elements within the FIFO that can yet be filled.
+		w_fill,
+		// A '1' here means a half FIFO length can be read (receive
+		// FIFO) or written to (not a receive FIFO).
+		// receive FIFO), or be written to (if it isn't).
+		(RXFIFO!=0)?w_half_full:w_half_full,
+		// A '1' here means the FIFO can be read from (if it is a
+		// receive FIFO), or be written to (if it isn't).
+		(RXFIFO!=0)?r_empty_n:w_full_n
+	};
+
+	assign	o_empty_n = r_empty_n;
 	
 endmodule

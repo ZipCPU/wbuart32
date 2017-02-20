@@ -19,9 +19,13 @@
 //	Now for the setup register.  The register is 32 bits, so that this
 //	UART may be set up over a 32-bit bus.
 //
+//	i_setup[30]	True if we are using hardware flow control.  This bit
+//		is ignored within this module, as any receive hardware flow
+//		control will need to be implemented elsewhere.
+//
 //	i_setup[29:28]	Indicates the number of data bits per word.  This will
-//	either be 2'b00 for an 8-bit word, 2'b01 for a 7-bit word, 2'b10
-//	for a six bit word, or 2'b11 for a five bit word.
+//		either be 2'b00 for an 8-bit word, 2'b01 for a 7-bit word, 2'b10
+//		for a six bit word, or 2'b11 for a five bit word.
 //
 //	i_setup[27]	Indicates whether or not to use one or two stop bits.
 //		Set this to one to expect two stop bits, zero for one.
@@ -90,7 +94,7 @@
 //	..7	Bits arrive
 //	8	Stop bit (x1)
 //	9	Stop bit (x2)
-///	c	break condition
+//	c	break condition
 //	d	Waiting for the channel to go high
 //	e	Waiting for the reset to complete
 //	f	Idle state
@@ -113,10 +117,10 @@
 
 module rxuart(i_clk, i_reset, i_setup, i_uart_rx, o_wr, o_data, o_break,
 			o_parity_err, o_frame_err, o_ck_uart);
-	parameter	INITIAL_SETUP = 30'd868;
+	parameter [30:0] INITIAL_SETUP = 31'd868;
 	// 8 data bits, no parity, (at least 1) stop bit
 	input			i_clk, i_reset;
-	input		[29:0]	i_setup;
+	input		[30:0]	i_setup;
 	input			i_uart_rx;
 	output	reg		o_wr;
 	output	reg	[7:0]	o_data;
@@ -132,6 +136,7 @@ module rxuart(i_clk, i_reset, i_setup, i_uart_rx, o_wr, o_data, o_break,
 	reg	[3:0]	state;
 
 	assign	clocks_per_baud = { 4'h0, r_setup[23:0] };
+	// assign hw_flow_control = !r_setup[30];
 	assign	data_bits   = r_setup[29:28];
 	assign	dblstop     = r_setup[27];
 	assign	use_parity  = r_setup[26];
@@ -214,10 +219,10 @@ module rxuart(i_clk, i_reset, i_setup, i_uart_rx, o_wr, o_data, o_break,
 
 	// Allow our controlling processor to change our setup at any time
 	// outside of receiving/processing a character.
-	initial	r_setup     = INITIAL_SETUP;
+	initial	r_setup     = INITIAL_SETUP[29:0];
 	always @(posedge i_clk)
 		if (state >= `RXU_RESET_IDLE)
-			r_setup <= i_setup;
+			r_setup <= i_setup[29:0];
 
 
 	// Our monster state machine.  YIKES!

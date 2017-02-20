@@ -47,13 +47,19 @@ module	wbuart(i_clk, i_rst,
 		i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data,
 			o_wb_ack, o_wb_stall, o_wb_data,
 		//
-		i_uart_rx, o_uart_tx,
+		i_uart_rx, o_uart_tx, i_rts, o_cts,
 		// i_uart_rts, o_uart_cts, i_uart_dtr, o_uart_dts
 		//
 		o_uart_rx_int, o_uart_tx_int,
 		o_uart_rxfifo_int, o_uart_txfifo_int);
-	parameter	INITIAL_SETUP = 30'd25, // 4MB 8N1, when using 100MHz clock
-			LGFLEN = 4;
+	parameter [30:0] INITIAL_SETUP = 31'd25; // 4MB 8N1, when using 100MHz clock
+	parameter [3:0]	LGFLEN = 4;
+	parameter [0:0]	HARDWARE_FLOW_CONTROL_PRESENT = 1'b1;
+	// Perform a simple/quick bounds check on the log FIFO length, to make
+	// sure its within the bounds we can support with our current
+	// interface.
+	localparam [3:0]	LCLLGFLEN = (LGFLEN > 4'ha)? 4'ha
+					: ((LGFLEN < 4'h2) ? 4'h2 : LGFLEN);
 	//
 	input	i_clk, i_rst;
 	// Wishbone inputs
@@ -66,6 +72,18 @@ module	wbuart(i_clk, i_rst,
 	//
 	input			i_uart_rx;
 	output	wire		o_uart_tx;
+	// RTS is used for hardware flow control.  According to Wikipedia, it
+	// should probably be renamed RTR for "ready to receive".  It tell us
+	// whether or not the receiving hardware is ready to accept another
+	// byte.  If low, the transmitter will pause.
+	//
+	// If you don't wish to use hardware flow control, just set i_rts to
+	// 1'b1 and let the optimizer simply remove this logic.
+	input			i_rts;
+	// CTS is the "Clear-to-send" signal.  We set it anytime our FIFO
+	// isn't full.  Feel free to ignore this output if you do not wish to
+	// use flow control.
+	output	reg		o_cts;
 	output	wire		o_uart_rx_int, o_uart_tx_int,
 				o_uart_rxfifo_int, o_uart_txfifo_int;
 
@@ -75,18 +93,25 @@ module	wbuart(i_clk, i_rst,
 	// The UART setup parameters: bits per byte, stop bits, parity, and
 	// baud rate are all captured within this uart_setup register.
 	//
-	reg	[29:0]	uart_setup;
+	reg	[30:0]	uart_setup;
 	initial	uart_setup = INITIAL_SETUP;
 	always @(posedge i_clk)
 		// Under wishbone rules, a write takes place any time i_wb_stb
 		// is high.  If that's the case, and if the write was to the
 		// setup address, then set us up for the new parameters.
 		if ((i_wb_stb)&&(i_wb_addr == `UART_SETUP)&&(i_wb_we))
-			uart_setup[29:0] <= i_wb_data[29:0];
+			uart_setup <= {
+				(i_wb_data[30])
+					||(!HARDWARE_FLOW_CONTROL_PRESENT),
+				i_wb_data[29:0] };
 
+	/////////////////////////////////////////
 	//
-	// First the UART receiver
 	//
+	// First, the UART receiver
+	//
+	//
+	/////////////////////////////////////////
 
 	// First the wires/registers this receiver depends upon
 	wire		rx_stb, rx_break, rx_perr, rx_ferr, ck_uart;
@@ -126,17 +151,31 @@ module	wbuart(i_clk, i_rst,
 	// four status-type values: 1) is it non-empty, 2) is the FIFO over half
 	// full, 3) a 16-bit status register, containing info regarding how full
 	// the FIFO truly is, and 4) an error indicator.
-	ufifo	#(.LGFLEN(LGFLEN))
+	ufifo	#(.LGFLEN(LCLLGFLEN), .RXFIFO(1))
 		rxfifo(i_clk, (i_rst)||(rx_break)||(rx_uart_reset),
 			rx_stb, rx_uart_data,
+			rx_empty_n,
 			rxf_wb_read, rxf_wb_data,
-			(rx_empty_n), (o_uart_rxfifo_int),
 			rxf_status, rx_fifo_err);
+	assign	o_uart_rxfifo_int = rxf_status[1];
 
 	// We produce four interrupts.  One of the receive interrupts indicates
 	// whether or not the receive FIFO is non-empty.  This should wake up
 	// the CPU.
-	assign	o_uart_rx_int = !rx_empty_n;
+	assign	o_uart_rx_int = rxf_status[0];
+
+	// The clear to send line, which may be ignored, but which we set here
+	// to be true any time the FIFO has fewer than N-2 items in it.
+	// Why N-1?  Because at N-1 we are totally full, but already so full
+	// that if the transmit end starts sending we won't have a location to
+	// receive it.  (Transmit might've started on the next character by the
+	// time we set this--need to set it to one character before necessary
+	// thus.)
+	wire	[(LCLLGFLEN-1):0]	check_cutoff;
+	assign	check_cutoff = -3;
+	always @(posedge i_clk)
+		o_cts = (!HARDWARE_FLOW_CONTROL_PRESENT)
+			||(rxf_status[(LCLLGFLEN+1):2] > check_cutoff);
 
 	// If the bus requests that we read from the receive FIFO, we need to
 	// tell this to the receive FIFO.  Note that because we are using a 
@@ -204,10 +243,14 @@ module	wbuart(i_clk, i_rst,
 				rx_break, rx_ferr, r_rx_perr, !rx_empty_n,
 				rxf_wb_data};
 
+	/////////////////////////////////////////
+	//
 	//
 	// Then the UART transmitter
 	//
-	wire		tx_empty_n, txf_half_full, txf_err;
+	//
+	/////////////////////////////////////////
+	wire		tx_empty_n, txf_err;
 	wire	[7:0]	tx_data;
 	wire	[15:0]	txf_status;
 	reg		r_tx_break, txf_wb_write, tx_uart_reset;
@@ -238,18 +281,20 @@ module	wbuart(i_clk, i_rst,
 	// break.  We read from the FIFO any time the UART transmitter is idle.
 	// and ... we just set the values (above) for controlling writing into
 	// this.
-	ufifo	#(.LGFLEN(LGFLEN))
+	ufifo	#(.LGFLEN(LGFLEN), .RXFIFO(0))
 		txfifo(i_clk, (r_tx_break)||(tx_uart_reset),
 			txf_wb_write, txf_wb_data,
-				(~tx_busy)&&(tx_empty_n), tx_data,
-			tx_empty_n, txf_half_full, txf_status, txf_err);
+			tx_empty_n,
+			(!tx_busy)&&(tx_empty_n), tx_data,
+			txf_status, txf_err);
 	// Let's create two transmit based interrupts from the FIFO for the CPU.
-	//	The first will be true any time the FIFO is empty.
-	assign	o_uart_tx_int = !tx_empty_n;
+	//	The first will be true any time the FIFO has at least one open
+	//	position within it.
+	assign	o_uart_tx_int = txf_status[0];
 	//	The second will be true any time the FIFO is less than half
 	//	full, allowing us a change to always keep it (near) fully 
 	//	charged.
-	assign	o_uart_txfifo_int = !txf_half_full;
+	assign	o_uart_txfifo_int = txf_status[1];
 
 	// Break logic
 	//
@@ -281,6 +326,8 @@ module	wbuart(i_clk, i_rst,
 		else
 			tx_uart_reset <= 1'b0;
 
+	wire	rts;
+	assign	rts = (!HARDWARE_FLOW_CONTROL_PRESENT)||(i_rts);
 	// Finally, the UART transmitter module itself.  Note that we haven't
 	// connected the reset wire.  Transmitting is as simple as setting
 	// the stb value (here set to tx_empty_n) and the data.  When these
@@ -292,7 +339,7 @@ module	wbuart(i_clk, i_rst,
 	// starting to transmit a new byte.)
 	txuart	#(INITIAL_SETUP) tx(i_clk, 1'b0, uart_setup,
 			r_tx_break, (tx_empty_n), tx_data,
-			o_uart_tx, tx_busy);
+			i_rts, o_uart_tx, tx_busy);
 
 	// Now that we are done with the chain, pick some wires for the user
 	// to read on any read of the transmit port.
@@ -302,15 +349,15 @@ module	wbuart(i_clk, i_rst,
 	// the receive FIFO, here only writing to the transmit port advances the
 	// transmit FIFO--hence the read values are free for ... whatever.)  
 	// We choose here to provide information about the transmit FIFO
-	// (txf_err, txf_half_full, tx_empty_n), information about the current
+	// (txf_err, txf_half_full, txf_full_n), information about the current
 	// voltage on the line (o_uart_tx)--and even the voltage on the receive
 	// line (ck_uart), as well as our current setting of the break and
 	// whether or not we are actively transmitting.
 	wire	[31:0]	wb_tx_data;
 	assign	wb_tx_data = { 16'h00, 
-				1'h0, txf_half_full, tx_empty_n, txf_err,
-				ck_uart, o_uart_tx, r_tx_break, tx_busy,
-				txf_wb_data};
+				i_rts, txf_status[1:0], txf_err,
+				ck_uart, o_uart_tx, r_tx_break, (tx_busy|txf_status[0]),
+				(tx_busy|txf_status[0])?txf_wb_data:8'b00};
 
 	// Each of the FIFO's returns a 16 bit status value.  This value tells
 	// us both how big the FIFO is, as well as how much of the FIFO is in 
@@ -339,7 +386,7 @@ module	wbuart(i_clk, i_rst,
 	// interconnect, etc.  For this reason, we can just simplify our logic.
 	always @(posedge i_clk)
 		casez(r_wb_addr)
-		`UART_SETUP: o_wb_data <= { 2'b00, uart_setup };
+		`UART_SETUP: o_wb_data <= { 1'b0, uart_setup };
 		`UART_FIFO:  o_wb_data <= wb_fifo_data;
 		`UART_RXREG: o_wb_data <= wb_rx_data;
 		`UART_TXREG: o_wb_data <= wb_tx_data;
