@@ -19,7 +19,7 @@
 //	Now for the setup register.  The register is 32 bits, so that this
 //	UART may be set up over a 32-bit bus.
 //
-//	i_setup[30]	True if we are using hardware flow control.  This bit
+//	i_setup[30]	True if we are not using hardware flow control.  This bit
 //		is ignored within this module, as any receive hardware flow
 //		control will need to be implemented elsewhere.
 //

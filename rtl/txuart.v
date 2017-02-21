@@ -171,7 +171,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	always	@(posedge i_clk)
 		qq_rts <= q_rts;
 	always	@(posedge i_clk)
-		ck_rts <= (qq_rts)&&(hw_flow_control);
+		ck_rts <= (qq_rts)||(!hw_flow_control);
 
 	initial	o_uart_tx = 1'b1;
 	initial	r_busy = 1'b1;
@@ -255,7 +255,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	// broken out up top, and indicate what 1) our baud rate is, 2) our
 	// number of stop bits, 3) what type of parity we are using, and 4)
 	// the size of our data word.
-	initial	r_setup = INITIAL_SETUP[30:0];
+	initial	r_setup = INITIAL_SETUP;
 	always @(posedge i_clk)
 		if (state == `TXU_IDLE)
 			r_setup <= i_setup;
