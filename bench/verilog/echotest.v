@@ -134,8 +134,8 @@ module	echotest(i_clk,
 			rx_break, rx_perr, rx_ferr, rx_ignored);
 
 	// Bypass any transmit hardware flow control.
-	wire	rts;
-	assign rts = 1'b1;
+	wire	cts_n;
+	assign cts_n = 1'b0;
 
 	wire	tx_busy;
 	txuart	transmitter(i_clk, pwr_reset, i_setup, rx_break,

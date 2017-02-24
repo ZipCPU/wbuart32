@@ -130,10 +130,10 @@ module	helloworld(i_clk,
 			tx_stb <= 1'b0;
 
 	// Bypass any hardware flow control
-	wire	rts;
-	assign	rts = 1'b1;
+	wire	cts_n;
+	assign	cts_n = 1'b0;
 
 	txuart	transmitter(i_clk, pwr_reset, i_setup, tx_break,
-			tx_stb, tx_data, rts, o_uart_tx, tx_busy);
+			tx_stb, tx_data, cts_n, o_uart_tx, tx_busy);
 
 endmodule

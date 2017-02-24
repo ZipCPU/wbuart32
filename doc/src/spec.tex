@@ -236,7 +236,7 @@ files to verify your own UART hardware functionality.
 
 To use the core, a couple of steps are required.  First, wire it up.  This
 includes wiring the {\tt i\_uart} and {\tt o\_uart} ports, as well as any
-{\tt i\_rts} and/or {\tt o\_cts} hardware flow control.  The
+{\tt i\_cts\_n} and/or {\tt o\_rts\_n} hardware flow control.  The
 {\tt rxuart.v} and {\tt txuart.v} files may be wired up for use individually,
 or as part of a large module such as the example in{\tt wbuart-insert.v}. 
 Alternatively, the {\tt wbuart.v} file may be connected to a straight 32--bit
@@ -599,8 +599,21 @@ Verilator, they need to be connected inside your Verilator test bench, as in:
 \end{tabbing}
 
 For those interested in hardware flow control, the core also offers an
-{\tt i\_rts} input to control the flow out of our transmitter, and an
-{\tt o\_cts} output when the receiver is full.
+{\tt i\_cts\_n} input to control the flow out of our transmitter, and an
+{\tt o\_rts\_n} output to indicate when the receiver is full.  Both of these
+wires are active low. 
+
+For those not interested in flow control there are three
+possibilities.  First, one can set the module parameter
+{\tt HARDWARE\_FLOW\_CONTROL\_PRESENT} to zero which will disable hardware
+flow control.  This will also permanently set the hardware flow control is off
+bit in the setup register.  Second, hardware flow control can be disabled by
+connecting a {\tt 1'b0} wire to {\tt i\_cts\_n} and by ignoring the
+{\tt o\_rts\_n} output.  In this case, the hardware flow control setup bit
+becomes an unused flip flop within the driver. The third way to disable
+hardware flow control is to simply disable it within the setup register.  In
+general, these approaches will only affect the transmitter's operation and how
+the {\tt o\_rts\_n} bit gets set.
 
 A more detailed discussion of the connections associated with these modules
 can begin with Tbl.~\ref{tbl:rxports},
@@ -628,7 +641,7 @@ detailing the I/O ports of the UART receiver, Tbl.~\ref{tbl:txports},
 {\tt i\_wr}	& 1 & Input & An input strobe.  Set to one when you wish to transmit data, clear once it has been accepted\\\hline
 {\tt i\_data}	& 8 & Input & The data to be transmitted, ignored unless
 		{\tt (i\_wr)\&\&(!o\_busy)} \\\hline
-{\tt i\_rts}	& 1 & Input & A hardware flow control wire, true if the receiver is ready to receive\\\hline
+{\tt i\_cts\_n}	& 1 & Input & A hardware flow control wire, true if the transmitter is cleared to send, active low\\\hline
 {\tt o\_uart}	& 1 & Output & The wire to be connected to the external port\\\hline
 {\tt o\_busy}	& 1 & Output & True if the transmitter is busy, false if it will receive data\\\hline
 \end{portlist}\caption{TXUART port list}\label{tbl:txports}
@@ -638,8 +651,8 @@ detailing the I/O ports of the UART transmitter, and Tbl.~\ref{tbl:wbports}
 \rowcolor[gray]{0.85} Port & W & Direction & Description \\\hline\hline
 {\tt i\_uart\_rx}& 1 & Input & The receive wire coming from the external port\\\hline
 {\tt o\_uart\_tx}& 1 & Output & The transmit wire to be connected to the external port\\\hline
-{\tt i\_rts}& 1 & Input  & The hardware flow control {\tt ready-to-send} (i.e. receive) input for the transmitter\\\hline
-{\tt o\_cts}& 1 & Output & The hardware flow control {\tt clear-to-send} output\\\hline
+{\tt i\_cts\_n}& 1 & Input  & The hardware flow control {\tt clear-to-send} input for the transmitter, active low\\\hline
+{\tt o\_rts\_n}& 1 & Output & The hardware flow control {\tt ready-to-send} (receive) output, also active low\\\hline
 {\tt o\_uart\_rx\_int}	& 1 & Output & True if a byte may be read from the receiver\\\hline
 {\tt o\_uart\_tx\_int}	& 1 & Output & True if a byte may be sent to the transmitter\\\hline
 {\tt o\_uart\_rxfifo\_int}&1& Output & True if the receive FIFO is half full\\\hline
