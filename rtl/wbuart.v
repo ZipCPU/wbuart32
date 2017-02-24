@@ -47,8 +47,7 @@ module	wbuart(i_clk, i_rst,
 		i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data,
 			o_wb_ack, o_wb_stall, o_wb_data,
 		//
-		i_uart_rx, o_uart_tx, i_rts, o_cts,
-		// i_uart_rts, o_uart_cts, i_uart_dtr, o_uart_dts
+		i_uart_rx, o_uart_tx, i_cts_n, o_rts_n,
 		//
 		o_uart_rx_int, o_uart_tx_int,
 		o_uart_rxfifo_int, o_uart_txfifo_int);
@@ -77,13 +76,13 @@ module	wbuart(i_clk, i_rst,
 	// whether or not the receiving hardware is ready to accept another
 	// byte.  If low, the transmitter will pause.
 	//
-	// If you don't wish to use hardware flow control, just set i_rts to
-	// 1'b1 and let the optimizer simply remove this logic.
-	input			i_rts;
+	// If you don't wish to use hardware flow control, just set i_cts_n to
+	// 1'b0 and let the optimizer simply remove this logic.
+	input			i_cts_n;
 	// CTS is the "Clear-to-send" signal.  We set it anytime our FIFO
 	// isn't full.  Feel free to ignore this output if you do not wish to
 	// use flow control.
-	output	reg		o_cts;
+	output	reg		o_rts_n;
 	output	wire		o_uart_rx_int, o_uart_tx_int,
 				o_uart_rxfifo_int, o_uart_txfifo_int;
 
@@ -170,12 +169,10 @@ module	wbuart(i_clk, i_rst,
 	// that if the transmit end starts sending we won't have a location to
 	// receive it.  (Transmit might've started on the next character by the
 	// time we set this--need to set it to one character before necessary
-	// thus.)
-	wire	[(LCLLGFLEN-1):0]	check_cutoff;
-	assign	check_cutoff = -3;
 	always @(posedge i_clk)
-		o_cts = (!HARDWARE_FLOW_CONTROL_PRESENT)
-			||(rxf_status[(LCLLGFLEN+1):2] > check_cutoff);
+		o_rts_n = ((HARDWARE_FLOW_CONTROL_PRESENT)
+			&&(!uart_setup[30])
+			&&(rxf_status[(LCLLGFLEN-1):2]=={(LCLLGFLEN-2){1'b1}}));
 
 	// If the bus requests that we read from the receive FIFO, we need to
 	// tell this to the receive FIFO.  Note that because we are using a 
@@ -326,8 +323,8 @@ module	wbuart(i_clk, i_rst,
 		else
 			tx_uart_reset <= 1'b0;
 
-	wire	rts;
-	assign	rts = (!HARDWARE_FLOW_CONTROL_PRESENT)||(i_rts);
+	wire	cts_n;
+	assign	cts_n = (HARDWARE_FLOW_CONTROL_PRESENT)&&(i_cts_n);
 	// Finally, the UART transmitter module itself.  Note that we haven't
 	// connected the reset wire.  Transmitting is as simple as setting
 	// the stb value (here set to tx_empty_n) and the data.  When these
@@ -339,7 +336,7 @@ module	wbuart(i_clk, i_rst,
 	// starting to transmit a new byte.)
 	txuart	#(INITIAL_SETUP) tx(i_clk, 1'b0, uart_setup,
 			r_tx_break, (tx_empty_n), tx_data,
-			i_rts, o_uart_tx, tx_busy);
+			cts_n, o_uart_tx, tx_busy);
 
 	// Now that we are done with the chain, pick some wires for the user
 	// to read on any read of the transmit port.
@@ -355,7 +352,7 @@ module	wbuart(i_clk, i_rst,
 	// whether or not we are actively transmitting.
 	wire	[31:0]	wb_tx_data;
 	assign	wb_tx_data = { 16'h00, 
-				i_rts, txf_status[1:0], txf_err,
+				i_cts_n, txf_status[1:0], txf_err,
 				ck_uart, o_uart_tx, r_tx_break, (tx_busy|txf_status[0]),
 				(tx_busy|txf_status[0])?txf_wb_data:8'b00};
 
