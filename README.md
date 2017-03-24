@@ -20,8 +20,13 @@ At one time, the biggest drawback to the files in these directories was that
 there wasn't a version of this UART interface containing a FIFO.  Well, no
 more.  Now there is a [wbuart.v](rtl/wbuart.v) file that can be
 integrated into a wishbone/B4/pipeline bus.  As mentioned above, this module
-contains a FIFO with a parameterized length that can extend up to 1023 entries. 
+contains a FIFO with a parameterized length that can extend up to 1023 entries.
 Indeed, recent changes have even added in optional hardware flow control, should
 you wish to use it.
 
 Thus this is a very simple and easy to use controller.
+
+# Commercial Applications
+
+Should you find the GPLv3 license insufficient for your needs, other licenses
+can be purchased from Gisselquist Technology, LLC.
