@@ -86,16 +86,16 @@
 		if(((i_wb_stb)&&(!i_wb_we)&&(i_wb_addr == `UART_RX_ADDR))
 				||(rx_stb))
 			r_rx_data[8] <= !rx_stb;
-	assign	o_cts = !r_rx_data[8];
+	assign	o_rts_n = r_rx_data[8];
 	assign	rx_data = { 20'h00, r_rx_data };
 	assign	rx_int = !r_rx_data[8];
 
-	// Transmit hardware flow control, the rts line
-	wire	rts;
-	// Set this rts value to one if you aren't ever going to use H/W flow
+	// Transmit hardware flow control, the cts line
+	wire	cts_n;
+	// Set this cts value to zero if you aren't ever going to use H/W flow
 	// control, otherwise set it to the value coming in from the external
-	// i_rts pin.
-	assign	rts = i_rts;
+	// i_cts_n pin.
+	assign	cts_n = i_cts_n;
 
 	//
 	// Then the UART transmitter
@@ -109,7 +109,7 @@
 	wire	[31:0]	tx_data;
 	txuart	#(UART_SETUP) tx(i_clk, 1'b0, uart_setup,
 			r_tx_break, r_tx_stb, r_tx_data,
-			rts, o_tx, tx_busy);
+			cts_n, o_tx, tx_busy);
 	always @(posedge i_clk)
 		if ((i_wb_stb)&&(i_wb_addr == 5'h0f))
 		begin
@@ -121,7 +121,7 @@
 			r_tx_stb <= 1'b0;
 			r_tx_data <= 8'h0;
 		end
-	assign	tx_data = { 16'h00, rts, 3'h0,
+	assign	tx_data = { 16'h00, cts_n, 3'h0,
 		ck_uart, o_tx, r_tx_break, tx_busy,
 		r_tx_data };
 	assign	tx_int = ~tx_busy;
