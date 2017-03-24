@@ -5,6 +5,8 @@ simulators = verilator
 
 [fileset rtl]
 files =
+  rtl/rxuartlite.v
+  rtl/txuartlite.v
   rtl/rxuart.v
   rtl/txuart.v
   rtl/ufifo.v
