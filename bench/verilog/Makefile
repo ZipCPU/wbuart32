@@ -85,13 +85,14 @@ $(VDIRFB)/Vlinetest__ALL.a: $(VDIRFB)/Vlinetest.h $(VDIRFB)/Vlinetest.cpp
 $(VDIRFB)/Vlinetest__ALL.a: $(VDIRFB)/Vlinetest.mk
 $(VDIRFB)/Vlinetest.h $(VDIRFB)/Vlinetest.cpp $(VDIRFB)/Vlinetest.mk: linetest.v
 $(VDIRFB)/Vlinetest.h $(VDIRFB)/Vlinetest.cpp $(VDIRFB)/Vlinetest.mk: $(RTLDR)/rxuart.v $(RTLDR)/txuart.v
+$(VDIRFB)/Vlinetest.h $(VDIRFB)/Vlinetest.cpp $(VDIRFB)/Vlinetest.mk: $(RTLDR)/rxuartlite.v $(RTLDR)/txuartlite.v
 
 $(VDIRFB)/Vhelloworld__ALL.a: $(VDIRFB)/Vhelloworld.h $(VDIRFB)/Vhelloworld.cpp
 $(VDIRFB)/Vhelloworld__ALL.a: $(VDIRFB)/Vhelloworld.mk
 $(VDIRFB)/Vhelloworld.h $(VDIRFB)/Vhelloworld.cpp $(VDIRFB)/Vhelloworld.mk: helloworld.v
-$(VDIRFB)/Vhelloworld.h $(VDIRFB)/Vhelloworld.cpp $(VDIRFB)/Vhelloworld.mk: $(RTLDR)/rxuart.v $(RTLDR)/txuart.v
+$(VDIRFB)/Vhelloworld.h $(VDIRFB)/Vhelloworld.cpp $(VDIRFB)/Vhelloworld.mk: $(RTLDR)/txuartlite.v $(RTLDR)/txuart.v
 
-SPEECHSRCS := $(addprefix $(RTLDR)/,rxuart.v txuart.v ufifo.v wbuart.v)
+SPEECHSRCS := $(addprefix $(RTLDR)/,rxuart.v txuart.v rxuartlite.v txuartlite.v ufifo.v wbuart.v)
 SPEECHVFILES:= $(addprefix $(VDIRFB)/,Vspeechfifo.h Vspeechfifo.cpp Vspeechfifo.mk)
 $(VDIRFB)/Vspeechfifo__ALL.a: $(VDIRFB)/Vspeechfifo.h $(VDIRFB)/Vspeechfifo.cpp
 $(VDIRFB)/Vspeechfifo__ALL.a: $(VDIRFB)/Vspeechfifo.mk

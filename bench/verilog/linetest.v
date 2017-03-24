@@ -54,6 +54,15 @@
 `define OPT_STANDALONE
 `endif
 //
+//
+// Two versions of the UART can be found in the rtl directory: a full featured
+// UART, and a LITE UART that only handles 8N1 -- no break sending, break
+// detection, parity error detection, etc.  If we set USE_LITE_UART here, those
+// simplified UART modules will be used.
+//
+// `define	USE_LITE_UART
+//
+//
 module	linetest(i_clk,
 `ifndef	OPT_STANDALONE
 			i_setup,
@@ -96,8 +105,13 @@ module	linetest(i_clk,
 	wire	rx_stb, rx_break, rx_perr, rx_ferr, rx_ignored;
 	wire	[7:0]	rx_data;
 
+`ifdef	USE_LITE_UART
+	rxuartlite #(24'd868)
+		receiver(i_clk, i_uart_rx, rx_stb, rx_data);
+`else
 	rxuart	receiver(i_clk, pwr_reset, i_setup, i_uart_rx, rx_stb, rx_data,
 			rx_break, rx_perr, rx_ferr, rx_ignored);
+`endif
 
 
 	// The next step in this process is to dump everything we read into a 
@@ -204,7 +218,12 @@ module	linetest(i_clk,
 	wire	cts_n;
 	assign	cts_n = 1'b0;
 
+`ifdef	USE_LITE_UART
+	txuartlite #(24'd868)
+		transmitter(i_clk, tx_stb, tx_data, o_uart_tx, tx_busy);
+`else
 	txuart	transmitter(i_clk, pwr_reset, i_setup, tx_break,
 			tx_stb, tx_data, cts_n, o_uart_tx, tx_busy);
+`endif
 
 endmodule

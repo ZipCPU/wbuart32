@@ -63,7 +63,7 @@ int	main(int argc, char **argv) {
 	UARTSIM		*uart;
 	bool		run_interactively = false;
 	int		port = 0;
-	unsigned	setup = 25;
+	unsigned	setup = 868;
 	char string[] = "This is a UART testing string\r\n";
 
 	for(int argn=1; argn<argc; argn++) {

@@ -49,14 +49,24 @@ VDIRFB:= $(FBDIR)/obj_dir
 test: $(VDIRFB)/Vtxuart__ALL.a
 test: $(VDIRFB)/Vrxuart__ALL.a
 test: $(VDIRFB)/Vwbuart__ALL.a
+test: $(VDIRFB)/Vtxuartlite__ALL.a
+test: $(VDIRFB)/Vrxuartlite__ALL.a
 
 $(VDIRFB)/Vrxuart__ALL.a: $(VDIRFB)/Vrxuart.h $(VDIRFB)/Vrxuart.cpp
 $(VDIRFB)/Vrxuart__ALL.a: $(VDIRFB)/Vrxuart.mk
 $(VDIRFB)/Vrxuart.h $(VDIRFB)/Vrxuart.cpp $(VDIRFB)/Vrxuart.mk: rxuart.v
 
+$(VDIRFB)/Vrxuartlite__ALL.a: $(VDIRFB)/Vrxuartlite.h $(VDIRFB)/Vrxuartlite.cpp
+$(VDIRFB)/Vrxuartlite__ALL.a: $(VDIRFB)/Vrxuartlite.mk
+$(VDIRFB)/Vrxuartlite.h $(VDIRFB)/Vrxuartlite.cpp $(VDIRFB)/Vrxuartlite.mk: rxuartlite.v
+
 $(VDIRFB)/Vtxuart__ALL.a: $(VDIRFB)/Vtxuart.h $(VDIRFB)/Vtxuart.cpp
 $(VDIRFB)/Vtxuart__ALL.a: $(VDIRFB)/Vtxuart.mk
 $(VDIRFB)/Vtxuart.h $(VDIRFB)/Vtxuart.cpp $(VDIRFB)/Vtxuart.mk: txuart.v
+
+$(VDIRFB)/Vtxuartlite__ALL.a: $(VDIRFB)/Vtxuartlite.h $(VDIRFB)/Vtxuartlite.cpp
+$(VDIRFB)/Vtxuartlite__ALL.a: $(VDIRFB)/Vtxuartlite.mk
+$(VDIRFB)/Vtxuartlite.h $(VDIRFB)/Vtxuartlite.cpp $(VDIRFB)/Vtxuartlite.mk: txuartlite.v
 
 $(VDIRFB)/Vwbuart__ALL.a: $(VDIRFB)/Vwbuart.h $(VDIRFB)/Vwbuart.cpp
 $(VDIRFB)/Vwbuart__ALL.a: $(VDIRFB)/Vwbuart.mk
