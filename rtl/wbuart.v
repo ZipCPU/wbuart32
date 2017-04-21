@@ -38,6 +38,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
+`default_nettype	none
+//
 `define	UART_SETUP	2'b00
 `define	UART_FIFO	2'b01
 `define	UART_RXREG	2'b10
@@ -60,16 +62,16 @@ module	wbuart(i_clk, i_rst,
 	localparam [3:0]	LCLLGFLEN = (LGFLEN > 4'ha)? 4'ha
 					: ((LGFLEN < 4'h2) ? 4'h2 : LGFLEN);
 	//
-	input	i_clk, i_rst;
+	input	wire		i_clk, i_rst;
 	// Wishbone inputs
-	input			i_wb_cyc, i_wb_stb, i_wb_we;
-	input		[1:0]	i_wb_addr;
-	input		[31:0]	i_wb_data;
+	input	wire		i_wb_cyc, i_wb_stb, i_wb_we;
+	input	wire	[1:0]	i_wb_addr;
+	input	wire	[31:0]	i_wb_data;
 	output	reg		o_wb_ack;
 	output	wire		o_wb_stall;
 	output	reg	[31:0]	o_wb_data;
 	//
-	input			i_uart_rx;
+	input	wire		i_uart_rx;
 	output	wire		o_uart_tx;
 	// RTS is used for hardware flow control.  According to Wikipedia, it
 	// should probably be renamed RTR for "ready to receive".  It tell us
@@ -78,7 +80,7 @@ module	wbuart(i_clk, i_rst,
 	//
 	// If you don't wish to use hardware flow control, just set i_cts_n to
 	// 1'b0 and let the optimizer simply remove this logic.
-	input			i_cts_n;
+	input	wire		i_cts_n;
 	// CTS is the "Clear-to-send" signal.  We set it anytime our FIFO
 	// isn't full.  Feel free to ignore this output if you do not wish to
 	// use flow control.
@@ -340,7 +342,7 @@ module	wbuart(i_clk, i_rst,
 			tx_uart_reset <= 1'b0;
 
 `ifdef	USE_LITE_UART
-	txuart	#(INITIAL_SETUP[23:0]) tx(i_clk, (tx_empty_n), tx_data,
+	txuartlite #(INITIAL_SETUP[23:0]) tx(i_clk, (tx_empty_n), tx_data,
 			o_uart_tx, tx_busy);
 `else
 	wire	cts_n;
