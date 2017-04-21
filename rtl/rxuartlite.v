@@ -45,27 +45,23 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-`define	RXU_BIT_ZERO		4'h0
-`define	RXU_BIT_ONE		4'h1
-`define	RXU_BIT_TWO		4'h2
-`define	RXU_BIT_THREE		4'h3
-`define	RXU_BIT_FOUR		4'h4
-`define	RXU_BIT_FIVE		4'h5
-`define	RXU_BIT_SIX		4'h6
-`define	RXU_BIT_SEVEN		4'h7
-// `define	RXU_PARITY		4'h8	// Unused in RXUARTLITE
-`define	RXU_STOP		4'h8
-// `define	RXU_SECOND_STOP		4'ha	// Unused in RXUARTLITE
-// Unused 4'hb
-// Unused 4'hc
-// `define	RXU_BREAK		4'hd	// Unused in RXUARTLITE
-// `define	RXU_RESET_IDLE		4'he	// Unused in RXUARTLITE
-`define	RXU_IDLE		4'hf
+`default_nettype	none
+//
+`define	RXUL_BIT_ZERO		4'h0
+`define	RXUL_BIT_ONE		4'h1
+`define	RXUL_BIT_TWO		4'h2
+`define	RXUL_BIT_THREE		4'h3
+`define	RXUL_BIT_FOUR		4'h4
+`define	RXUL_BIT_FIVE		4'h5
+`define	RXUL_BIT_SIX		4'h6
+`define	RXUL_BIT_SEVEN		4'h7
+`define	RXUL_STOP		4'h8
+`define	RXUL_IDLE		4'hf
 
 module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	parameter [23:0] CLOCKS_PER_BAUD = 24'd868;
-	input			i_clk;
-	input			i_uart_rx;
+	input	wire		i_clk;
+	input	wire		i_uart_rx;
 	output	reg		o_wr;
 	output	reg	[7:0]	o_data;
 
@@ -115,26 +111,26 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 		half_baud_time <= (~ck_uart)&&(chg_counter >= half_baud);
 
 
-	initial	state = `RXU_IDLE;
+	initial	state = `RXUL_IDLE;
 	always @(posedge i_clk)
 	begin
-		if (state == `RXU_IDLE)
+		if (state == `RXUL_IDLE)
 		begin // Idle state, independent of baud counter
 			// By default, just stay in the IDLE state
-			state <= `RXU_IDLE;
+			state <= `RXUL_IDLE;
 			if ((~ck_uart)&&(half_baud_time))
 				// UNLESS: We are in the center of a valid
 				// start bit
-				state <= `RXU_BIT_ZERO;
+				state <= `RXUL_BIT_ZERO;
 		end else if (zero_baud_counter)
 		begin
-			if (state < `RXU_STOP)
+			if (state < `RXUL_STOP)
 				// Data arrives least significant bit first.
 				// By the time this is clocked in, it's what
 				// you'll have.
 				state <= state + 1;
 			else // Wait for the next character
-				state <= `RXU_IDLE;
+				state <= `RXUL_IDLE;
 		end
 	end
 
@@ -159,7 +155,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	reg	pre_wr;
 	initial	pre_wr = 1'b0;
 	always @(posedge i_clk)
-		if ((zero_baud_counter)&&(state == `RXU_STOP))
+		if ((zero_baud_counter)&&(state == `RXUL_STOP))
 		begin
 			o_wr   <= 1'b1;
 			o_data <= data_reg;
@@ -173,7 +169,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	// we set ourselves up for clocks_per_baud counts between baud
 	// intervals.
 	always @(posedge i_clk)
-		if ((zero_baud_counter)|||(state == `RXU_IDLE))
+		if ((zero_baud_counter)|||(state == `RXUL_IDLE))
 			baud_counter <= CLOCKS_PER_BAUD-1'b1;
 		else
 			baud_counter <= baud_counter-1'b1;
@@ -186,7 +182,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	// before--cleaning up some otherwise difficult timing dependencies.
 	initial	zero_baud_counter = 1'b0;
 	always @(posedge i_clk)
-		if (state == `RXU_IDLE)
+		if (state == `RXUL_IDLE)
 			zero_baud_counter <= 1'b0;
 		else
 			zero_baud_counter <= (baud_counter == 24'h01);

@@ -49,23 +49,25 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-`define	TXU_BIT_ZERO	4'h0
-`define	TXU_BIT_ONE	4'h1
-`define	TXU_BIT_TWO	4'h2
-`define	TXU_BIT_THREE	4'h3
-`define	TXU_BIT_FOUR	4'h4
-`define	TXU_BIT_FIVE	4'h5
-`define	TXU_BIT_SIX	4'h6
-`define	TXU_BIT_SEVEN	4'h7
-`define	TXU_STOP	4'h8
-`define	TXU_IDLE	4'hf
+`default_nettype	none
+//
+`define	TXUL_BIT_ZERO	4'h0
+`define	TXUL_BIT_ONE	4'h1
+`define	TXUL_BIT_TWO	4'h2
+`define	TXUL_BIT_THREE	4'h3
+`define	TXUL_BIT_FOUR	4'h4
+`define	TXUL_BIT_FIVE	4'h5
+`define	TXUL_BIT_SIX	4'h6
+`define	TXUL_BIT_SEVEN	4'h7
+`define	TXUL_STOP	4'h8
+`define	TXUL_IDLE	4'hf
 //
 //
 module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	parameter	[23:0]	CLOCKS_PER_BAUD = 24'd868;
-	input			i_clk;
-	input			i_wr;
-	input		[7:0]	i_data;
+	input	wire		i_clk;
+	input	wire		i_wr;
+	input	wire	[7:0]	i_data;
 	// And the UART input line itself
 	output	reg		o_uart_tx;
 	// A line to tell others when we are ready to accept data.  If
@@ -79,28 +81,28 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	reg		r_busy, zero_baud_counter;
 
 	initial	r_busy = 1'b1;
-	initial	state  = `TXU_IDLE;
+	initial	state  = `TXUL_IDLE;
 	initial	lcl_data= 8'h0;
 	always @(posedge i_clk)
 	begin
 		if (!zero_baud_counter)
 			// r_busy needs to be set coming into here
 			r_busy <= 1'b1;
-		else if (state == `TXU_IDLE)	// STATE_IDLE
+		else if (state == `TXUL_IDLE)	// STATE_IDLE
 		begin
 			r_busy <= 1'b0;
 			if ((i_wr)&&(!r_busy))
 			begin	// Immediately start us off with a start bit
 				r_busy <= 1'b1;
-				state <= `TXU_BIT_ZERO;
+				state <= `TXUL_BIT_ZERO;
 			end
 		end else begin
 			// One clock tick in each of these states ...
 			r_busy <= 1'b1;
-			if (state <=`TXU_STOP) // start bit, 8-d bits, stop-b
+			if (state <=`TXUL_STOP) // start bit, 8-d bits, stop-b
 				state <= state + 1;
 			else
-				state <= `TXU_IDLE;
+				state <= `TXUL_IDLE;
 		end 
 	end
 
@@ -175,7 +177,7 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	// than waiting for the end of the next (fictitious and arbitrary) baud
 	// interval.
 	//
-	// When (i_wr)&&(!r_busy)&&(state == `TXU_IDLE) then we're not only in
+	// When (i_wr)&&(!r_busy)&&(state == `TXUL_IDLE) then we're not only in
 	// the idle state, but we also just accepted a command to start writing
 	// the next word.  At this point, the baud counter needs to be reset
 	// to the number of CLOCKS_PER_BAUD, and zero_baud_counter set to zero.
@@ -188,7 +190,7 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	always @(posedge i_clk)
 	begin
 		zero_baud_counter <= (baud_counter == 24'h01);
-		if (state == `TXU_IDLE)
+		if (state == `TXUL_IDLE)
 		begin
 			baud_counter <= 24'h0;
 			zero_baud_counter <= 1'b1;
