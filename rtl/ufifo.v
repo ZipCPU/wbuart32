@@ -35,15 +35,17 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
+`default_nettype	none
+//
 module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_err);
 	parameter	BW=8;	// Byte/data width
 	parameter [3:0]	LGFLEN=4;
 	parameter 	RXFIFO=1'b0;
-	input			i_clk, i_rst;
-	input			i_wr;
-	input	[(BW-1):0]	i_data;
+	input	wire		i_clk, i_rst;
+	input	wire		i_wr;
+	input	wire [(BW-1):0]	i_data;
 	output	wire		o_empty_n;	// True if something is in FIFO
-	input			i_rd;
+	input	wire		i_rd;
 	output	wire [(BW-1):0]	o_data;
 	output	wire	[15:0]	o_status;
 	output	wire		o_err;
@@ -67,7 +69,7 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 		else if (i_rd)
 			will_overflow <= (will_overflow)&&(i_wr);
 		else if (i_wr)
-			will_overflow <= (w_first_plus_two == r_last);
+			will_overflow <= (will_overflow)||(w_first_plus_two == r_last);
 		else if (w_first_plus_one == r_last)
 			will_overflow <= 1'b1;
 
@@ -111,7 +113,7 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 		else if (i_wr)
 			will_underflow <= (will_underflow)&&(i_rd);
 		else if (i_rd)
-			will_underflow <= (w_last_plus_one == r_first);
+			will_underflow <= (will_underflow)||(w_last_plus_one == r_first);
 		else
 			will_underflow <= (r_last == r_first);
 
@@ -143,7 +145,7 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 			// else r_unfl <= 1'b1;
 		end
 
-	reg	[7:0]	fifo_here, fifo_next, r_data;
+	reg	[(BW-1):0]	fifo_here, fifo_next, r_data;
 	always @(posedge i_clk)
 		fifo_here <= fifo[r_last];
 	always @(posedge i_clk)
@@ -172,11 +174,13 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 	always @(posedge i_clk)
 		if (i_rst)
 			r_empty_n <= 1'b0;
-		else case({i_wr, i_rd})
-			2'b00: r_empty_n <= (r_first != r_last);
-			2'b11: r_empty_n <= (r_first != r_last);
-			2'b10: r_empty_n <= 1'b1;
-			2'b01: r_empty_n <= (r_first != w_last_plus_one);
+		else casez({i_wr, i_rd, will_underflow})
+			3'b00?: r_empty_n <= (r_first != r_last);
+			3'b11?: r_empty_n <= (r_first != r_last);
+			3'b10?: r_empty_n <= 1'b1;
+			3'b010: r_empty_n <= (r_first != w_last_plus_one);
+			// 3'b001: r_empty_n <= 1'b0;
+			default: begin end
 		endcase
 
 	wire	w_full_n;
@@ -190,6 +194,7 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 	//
 	// Adjust for these differences here.
 	reg	[(LGFLEN-1):0]	r_fill;
+	initial	r_fill = 0;
 	always @(posedge i_clk)
 		if (RXFIFO!=0) begin
 			// Calculate the number of elements in our FIFO
@@ -199,14 +204,15 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 			// another context.
 			if (i_rst)
 				r_fill <= 0;
-			else case({i_wr, i_rd})
+			else case({(i_wr)&&(!will_overflow), (i_rd)&&(!will_underflow)})
 			2'b01:   r_fill <= r_first - r_next;
 			2'b10:   r_fill <= r_first - r_last + 1'b1;
 			default: r_fill <= r_first - r_last;
 			endcase
 		end else begin
 			// Calculate the number of elements that are empty and
-			// can be filled within our FIFO
+			// can be filled within our FIFO.  Hence, this is really
+			// not the fill, but (SIZE-1)-fill.
 			if (i_rst)
 				r_fill <= { (LGFLEN){1'b1} };
 			else case({i_wr, i_rd})
