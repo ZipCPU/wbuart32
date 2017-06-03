@@ -67,6 +67,7 @@ You should have received a copy of the GNU General Public License along
 with this program.  If not, see \texttt{http://www.gnu.org/licenses/} for a copy.
 \end{license}
 \begin{revisionhistory}
+1.01 & 6/02/2017 & D. Gisselquist & Clarified register descriptions\\\hline
 1.0 & 2/20/2017 & D. Gisselquist & Added Hardware Flow Control\\\hline
 0.2 & 1/03/2017 & D. Gisselquist & Added test-bench information\\\hline
 0.1 & 8/26/2016 & D. Gisselquist & Initial Draft Specification\\\hline
@@ -349,7 +350,8 @@ to a value of three for five bit words.  $S$ determines the number of stop
 bits.  Set this to one for two stop bits, or leave it at zero for a single
 stop bit.  $P$ determines whether or not a parity bit is used (1~for parity,
 0~for no parity), while $F$ determines whether or not the parity is fixed. 
-Tbl.~\ref{tbl:parity} lists out the various values possible here.
+Tbl.~\ref{tbl:parity} lists how $P$, $F$, and $T$ affect which parity
+is being used.
 \begin{table}\begin{center}
 \begin{tabular}{ccc|l}
 P&F&T&Setting \\\hline\hline
@@ -364,7 +366,7 @@ P&F&T&Setting \\\hline\hline
 The final portion of this register is the baud {\tt CLKS}.  This is the number
 of ticks of your system clock per baud interval,
 \begin{eqnarray*}
-{\tt CLKS} &=& \frac{f_{\mbox{\tiny SYS}}}{f_{\mbox{\tiny BAUD}}}.
+{\tt CLKS} &=& \left\lfloor \frac{f_{\mbox{\tiny SYS}}}{f_{\mbox{\tiny BAUD}}} \right\rfloor.
 \end{eqnarray*}
 Rounding to the nearest integer is recommended.  Hence, if you have a system
 clock of 100~MHz and wish to achieve 115,200~Baud, you would set {\tt CLKS} to
