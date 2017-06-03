@@ -76,10 +76,10 @@ OBJDIR  := obj-pc
 RTLD	:= ../verilog
 VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
 VROOT   := $(VERILATOR_ROOT)
-INCS	:= -I$(RTLD)/obj_dir/ -I/usr/share/verilator/include
+INCS	:= -I$(RTLD)/obj_dir/ -I$(VROOT)/include
 SOURCES := helloworld.cpp linetest.cpp uartsim.cpp uartsim.h
 VOBJDR	:= $(RTLD)/obj_dir
-SYSVDR	:= /usr/share/verilator/include
+SYSVDR	:= $(VROOT)/include
 VLIB	:= $(SYSVDR)/verilated.cpp $(SYSVDR)/verilated_vcd_c.cpp
 # Sources necessary to build the linetest program (rxuart-txuart test)
 LINSRCS := linetest.cpp uartsim.cpp
