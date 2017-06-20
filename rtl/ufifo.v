@@ -4,7 +4,14 @@
 //
 // Project:	wbuart32, a full featured UART with simulator
 //
-// Purpose:	
+// Purpose:	A synchronous data FIFO, designed for supporting the Wishbone
+//		UART.  Particular features include the ability to read and
+//	write on the same clock, while maintaining the correct output FIFO
+//	parameters.  Two versions of the FIFO exist within this file, separated
+//	by the RXFIFO parameter's value.  One, where RXFIFO = 1, produces status
+//	values appropriate for reading and checking a read FIFO from logic, whereas
+//	the RXFIFO = 0 applies to writing to the FIFO from bus logic and reading
+//	it automatically any time the transmit UART is idle.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC

@@ -95,7 +95,8 @@ module	wbuart(i_clk, i_rst,
 	// baud rate are all captured within this uart_setup register.
 	//
 	reg	[30:0]	uart_setup;
-	initial	uart_setup = INITIAL_SETUP;
+	initial	uart_setup = INITIAL_SETUP
+		| ((HARDWARE_FLOW_CONTROL_PRESENT==1'b0)? 31'h40000000 : 0);
 	always @(posedge i_clk)
 		// Under wishbone rules, a write takes place any time i_wb_stb
 		// is high.  If that's the case, and if the write was to the
@@ -180,11 +181,14 @@ module	wbuart(i_clk, i_rst,
 	// Why N-1?  Because at N-1 we are totally full, but already so full
 	// that if the transmit end starts sending we won't have a location to
 	// receive it.  (Transmit might've started on the next character by the
-	// time we set this--need to set it to one character before necessary
+	// time we set this--thus we need to set it to one, one character before
+	// necessary).
+	wire	[(LCLLGFLEN-1):0]	check_cutoff;
+	assign	check_cutoff = -3;
 	always @(posedge i_clk)
 		o_rts_n = ((HARDWARE_FLOW_CONTROL_PRESENT)
 			&&(!uart_setup[30])
-			&&(rxf_status[(LCLLGFLEN+1):4]=={(LCLLGFLEN-2){1'b1}}));
+			&&(rxf_status[(LCLLGFLEN+1):2] > check_cutoff));
 
 	// If the bus requests that we read from the receive FIFO, we need to
 	// tell this to the receive FIFO.  Note that because we are using a 
