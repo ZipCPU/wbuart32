@@ -80,34 +80,37 @@ INCS	:= -I$(RTLD)/obj_dir/ -I$(VROOT)/include
 SOURCES := helloworld.cpp linetest.cpp uartsim.cpp uartsim.h
 VOBJDR	:= $(RTLD)/obj_dir
 SYSVDR	:= $(VROOT)/include
-VLIB	:= $(SYSVDR)/verilated.cpp $(SYSVDR)/verilated_vcd_c.cpp
+VSRC	:= verilated.cpp verilated_vcd_c.cpp
+VLIB	:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(VSRC)))
 # Sources necessary to build the linetest program (rxuart-txuart test)
 LINSRCS := linetest.cpp uartsim.cpp
 LINOBJ := $(subst .cpp,.o,$(LINSRCS))
-LINOBJS:= $(addprefix $(OBJDIR)/,$(LINOBJ))
+LINOBJS:= $(addprefix $(OBJDIR)/,$(LINOBJ)) $(VLIB)
 # Sources necessary to build the helloworld test (txuart test)
 HLOSRCS := helloworld.cpp uartsim.cpp
 HLOOBJ := $(subst .cpp,.o,$(HLOSRCS))
-HLOOBJS:= $(addprefix $(OBJDIR)/,$(HLOOBJ))
+HLOOBJS:= $(addprefix $(OBJDIR)/,$(HLOOBJ)) $(VLIB)
 # Sources necessary to build the speech test (wbuart test)
 SPCHSRCS:= speechtest.cpp uartsim.cpp
 SPCHOBJ := $(subst .cpp,.o,$(SPCHSRCS))
-SPCHOBJS:= $(addprefix $(OBJDIR)/,$(SPCHOBJ))
+SPCHOBJS:= $(addprefix $(OBJDIR)/,$(SPCHOBJ)) $(VLIB)
 all:	$(OBJDIR)/ linetest helloworld speechtest test
-
-$(OBJDIR)/:
-	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR); fi"
 
 $(OBJDIR)/uartsim.o: uartsim.cpp uartsim.h
 
 $(OBJDIR)/%.o: %.cpp
+	$(mk-objdir)
+	$(CXX) $(FLAGS) $(INCS) -c $< -o $@
+
+$(OBJDIR)/%.o: $(SYSVDR)/%.cpp
+	$(mk-objdir)
 	$(CXX) $(FLAGS) $(INCS) -c $< -o $@
 
 linetest: $(LINOBJS) $(VOBJDR)/Vlinetest__ALL.a
-	$(CXX) $(FLAGS) $(INCS) $^ $(VLIB) -o $@
+	$(CXX) $(FLAGS) $(INCS) $^ -o $@
 
 helloworld: $(HLOOBJS) $(VOBJDR)/Vhelloworld__ALL.a
-	$(CXX) $(FLAGS) $(INCS) $^ $(VLIB) -o $@
+	$(CXX) $(FLAGS) $(INCS) $^ -o $@
 
 #
 # The speech test program depends upon a copy of the Gettysburg Address,
@@ -131,11 +134,41 @@ speech.hex: mkspeech speech.txt
 # Actually, we could've done this without the speech file being available, but
 # this works.
 speechtest: speech.hex $(SPCHOBJS) $(VOBJDR)/Vspeechfifo__ALL.a 
-	$(CXX) $(FLAGS) $(INCS) $(SPCHOBJS) $(VOBJDR)/Vspeechfifo__ALL.a $(VLIB) -o $@
+	$(CXX) $(FLAGS) $(INCS) $(SPCHOBJS) $(VOBJDR)/Vspeechfifo__ALL.a -o $@
 
 test: linetest speechtest
 	./linetest
 	./speechtest
+
+#
+# The "depends" target, to know what files things depend upon.  The depends
+# file itself is kept in $(OBJDIR)/depends.txt
+#
+define	build-depends
+	$(mk-objdir)
+	@echo "Building dependency file"
+	@$(CXX) $(CFLAGS) $(INCS) -MM $(SOURCES) > $(OBJDIR)/xdepends.txt
+	@sed -e 's/^.*.o: /$(OBJDIR)\/&/' < $(OBJDIR)/xdepends.txt > $(OBJDIR)/depends.txt
+	@rm $(OBJDIR)/xdepends.txt
+endef
+
+.PHONY: depends
+depends: tags
+	$(build-depends)
+
+$(OBJDIR)/depends.txt: depends
+
+#
+define	mk-objdir
+	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR); fi"
+endef
+
+#
+# The "tags" target
+#
+tags:	$(SOURCES) $(HEADERS)
+	@echo "Generating tags"
+	@ctags $(SOURCES) $(HEADERS)
 
 .PHONY: clean
 clean:
@@ -143,3 +176,4 @@ clean:
 	rm -f ./mkspeech ./speech.hex
 	rm -rf $(OBJDIR)/
 
+-include $(OBJDIR)/depends.txt

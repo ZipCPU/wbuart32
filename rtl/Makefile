@@ -44,6 +44,7 @@ YYMMDD=`date +%Y%m%d`
 CXX   := g++
 FBDIR := .
 VDIRFB:= $(FBDIR)/obj_dir
+VERILATOR := verilator
 
 .PHONY: test
 test: $(VDIRFB)/Vtxuart__ALL.a
@@ -73,7 +74,7 @@ $(VDIRFB)/Vwbuart__ALL.a: $(VDIRFB)/Vwbuart.mk
 $(VDIRFB)/Vwbuart.h $(VDIRFB)/Vwbuart.cpp $(VDIRFB)/Vwbuart.mk: wbuart.v ufifo.v txuart.v rxuart.v
 
 $(VDIRFB)/V%.cpp $(VDIRFB)/V%.h $(VDIRFB)/V%.mk: $(FBDIR)/%.v
-	verilator -cc $*.v 
+	$(VERILATOR) -cc $*.v
 
 $(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.mk
 	cd $(VDIRFB); make -f V$*.mk
