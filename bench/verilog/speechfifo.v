@@ -87,10 +87,21 @@ module	speechfifo(i_clk,
 	reg	[1:0]	wb_addr;
 	reg	[31:0]	wb_data;
 
-	wire		uart_stall, uart_ack;
-	wire	[31:0]	uart_data;
+	wire		uart_stall;
 
-	wire		tx_int, txfifo_int;
+	// We aren't using the receive interrupts, or the received data, or the
+	// ready to send line, so we'll just mark them all here as ignored.
+
+	/* verilator lint_off UNUSED */
+	wire		uart_ack, tx_int;
+	wire	[31:0]	uart_data;
+	wire		ignored_rx_int, ignored_rxfifo_int;
+	wire		rts_n_ignored;
+	/* verilator lint_on UNUSED */
+
+	/* verilator lint_on UNUSED */
+
+	wire		txfifo_int;
 
 	// The next four lines create a strobe signal that is true on the first
 	// clock, but never after.  This makes for a decent power-on reset
@@ -248,10 +259,6 @@ module	speechfifo(i_clk,
 			// But once the FIFO gets to half full, stop.
 			wb_stb <= 1'b0;
 
-	// We aren't using the receive interrupts, so we'll just mark them
-	// here as ignored.
-	wire	ignored_rx_int, ignored_rxfifo_int;
-
 	// The WBUART can handle hardware flow control signals.  This test,
 	// however, cannot.  The reason?  Simply just to keep things simple.
 	// If you want to add hardware flow control to your design, simply
@@ -259,7 +266,7 @@ module	speechfifo(i_clk,
 	//
 	// Since this is an output only module demonstrator, what would be the
 	// cts output is unused.
-	wire	cts_n, rts_n_ignored;
+	wire	cts_n;
 	assign	cts_n = 1'b0;
 
 	// Finally--the unit under test--now that we've set up all the wires

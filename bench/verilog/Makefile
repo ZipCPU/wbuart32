@@ -18,7 +18,7 @@
 ##
 ##		// If we have a 100MHz clock, then we can set up for a 115,200
 ##		// baud clock by setting i_setup to (100MHz / 115200) ~= 868.
-##		// The upper bits of this number also set the protocol to 
+##		// The upper bits of this number also set the protocol to
 ##		// one stop bit, no parity, and 8 data  bits.
 ##		assign	i_setup = 30'd868; 	// 115,200 Baud 8N1
 ##
@@ -100,7 +100,7 @@ $(VDIRFB)/Vspeechfifo__ALL.a: $(VDIRFB)/Vspeechfifo.mk
 $(SPEECHVFILES): speechfifo.v $(SPEECHSRCS)
 
 $(VDIRFB)/V%.cpp $(VDIRFB)/V%.h $(VDIRFB)/V%.mk: $(FBDIR)/%.v
-	$(VERILATOR) --trace -cc -y ../../rtl $*.v 
+	$(VERILATOR) -Wall --trace -cc -y ../../rtl $*.v
 
 $(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.mk
 	cd $(VDIRFB); make -f V$*.mk

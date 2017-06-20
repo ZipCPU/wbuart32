@@ -74,7 +74,7 @@ $(VDIRFB)/Vwbuart__ALL.a: $(VDIRFB)/Vwbuart.mk
 $(VDIRFB)/Vwbuart.h $(VDIRFB)/Vwbuart.cpp $(VDIRFB)/Vwbuart.mk: wbuart.v ufifo.v txuart.v rxuart.v
 
 $(VDIRFB)/V%.cpp $(VDIRFB)/V%.h $(VDIRFB)/V%.mk: $(FBDIR)/%.v
-	$(VERILATOR) -cc $*.v
+	$(VERILATOR) -Wall -cc $*.v
 
 $(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.mk
 	cd $(VDIRFB); make -f V$*.mk

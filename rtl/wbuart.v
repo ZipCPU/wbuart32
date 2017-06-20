@@ -62,11 +62,17 @@ module	wbuart(i_clk, i_rst,
 	localparam [3:0]	LCLLGFLEN = (LGFLEN > 4'ha)? 4'ha
 					: ((LGFLEN < 4'h2) ? 4'h2 : LGFLEN);
 	//
-	input	wire		i_clk, i_rst;
+	/* verilator lint_off UNUSED */
+	input	wire		i_clk;
+	/* verilator lint_on UNUSED */
+	input	wire		i_rst;
 	// Wishbone inputs
-	input	wire		i_wb_cyc, i_wb_stb, i_wb_we;
+	/* verilator lint_off UNUSED */
+	input	wire		i_wb_cyc;	// We ignore CYC for efficiency
+	input	wire	[31:0]	i_wb_data;	// and only use 30 lines here
+	/* verilator lint_on UNUSED */
+	input	wire		i_wb_stb, i_wb_we;
 	input	wire	[1:0]	i_wb_addr;
-	input	wire	[31:0]	i_wb_data;
 	output	reg		o_wb_ack;
 	output	wire		o_wb_stall;
 	output	reg	[31:0]	o_wb_data;
@@ -186,7 +192,7 @@ module	wbuart(i_clk, i_rst,
 	wire	[(LCLLGFLEN-1):0]	check_cutoff;
 	assign	check_cutoff = -3;
 	always @(posedge i_clk)
-		o_rts_n = ((HARDWARE_FLOW_CONTROL_PRESENT)
+		o_rts_n <= ((HARDWARE_FLOW_CONTROL_PRESENT)
 			&&(!uart_setup[30])
 			&&(rxf_status[(LCLLGFLEN+1):2] > check_cutoff));
 

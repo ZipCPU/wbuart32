@@ -91,7 +91,7 @@ module	linetest(i_clk,
 	reg	pwr_reset;
 	initial	pwr_reset = 1'b1;
 	always @(posedge i_clk)
-		pwr_reset = 1'b0;
+		pwr_reset <= 1'b0;
 
 
 
@@ -102,7 +102,10 @@ module	linetest(i_clk,
 	// Data (rx_data) is present when rx_stb is true.  Any parity or
 	// frame errors will also be valid at that time.  Finally, we'll ignore
 	// errors, and even the clocked uart input distributed from here.
-	wire	rx_stb, rx_break, rx_perr, rx_ferr, rx_ignored;
+	wire	rx_stb, rx_break, rx_perr, rx_ferr;
+	/* verilator lint_off UNUSED */
+	wire	rx_ignored;
+	/* verilator lint_on UNUSED */
 	wire	[7:0]	rx_data;
 
 `ifdef	USE_LITE_UART

@@ -66,7 +66,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	output	reg	[7:0]	o_data;
 
 
-	wire	[23:0]	clocks_per_baud, half_baud;
+	wire	[23:0]	half_baud;
 	reg	[3:0]	state;
 
 	assign	half_baud = { 1'b0, CLOCKS_PER_BAUD[23:1] } - 24'h1;
@@ -152,8 +152,6 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	// available.
 	//
 	initial	o_data = 8'h00;
-	reg	pre_wr;
-	initial	pre_wr = 1'b0;
 	always @(posedge i_clk)
 		if ((zero_baud_counter)&&(state == `RXUL_STOP))
 		begin
@@ -166,7 +164,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	//
 	// This is used as a "clock divider" if you will, but the clock needs
 	// to be reset before any byte can be decoded.  In all other respects,
-	// we set ourselves up for clocks_per_baud counts between baud
+	// we set ourselves up for CLOCKS_PER_BAUD counts between baud
 	// intervals.
 	always @(posedge i_clk)
 		if ((zero_baud_counter)|||(state == `RXUL_IDLE))
