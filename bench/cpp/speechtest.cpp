@@ -116,7 +116,7 @@ int	main(int argc, char **argv) {
 		tfp->open("speechtrace.vcd");
 
 		testcount = 0;
-		while(testcount < baudclocks * 16 * 2048) {
+		while(testcount < baudclocks * 16 * 4096) {
 			// Run one tick of the clock.
 
 			tb.i_clk = 1;	// Positive edge

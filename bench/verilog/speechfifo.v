@@ -21,7 +21,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -72,6 +72,10 @@ module	speechfifo(i_clk,
 	// i_setup, but at least it gives us something to start with/from.
 	parameter	INITIAL_UART_SETUP = 31'd868;
 
+	// Let's set our message length, in case we ever wish to change it in
+	// the future
+	localparam	MSGLEN=2203;
+
 	// The i_setup wires are input when run under Verilator, but need to
 	// be set internally if this is going to run as a standalone top level
 	// test configuration.
@@ -118,7 +122,7 @@ module	speechfifo(i_clk,
 	// element to a space so that if (for some reason) we broadcast past the
 	// end of our message, we'll at least be sending something useful.
 	integer	i;
-	reg	[7:0]	message [0:2047];
+	reg	[7:0]	message [0:4095];
 	initial begin
 		// xx Verilator needs this file to be in the directory the file
 		// is run from.  For that reason, the project builds, makes,
@@ -132,8 +136,9 @@ module	speechfifo(i_clk,
 		// synthesis tool can find it.
 		//
 		$readmemh("speech.hex", message);
-		for(i=1481; i<2048; i=i+1)
+		for(i=MSGLEN; i<4095; i=i+1)
 			message[i] = 8'h20;
+
 		//
 		// The problem with the above approach is Xilinx's ISE program.
 		// It's broken.  It can't handle HEX files well (at all?) and
@@ -175,8 +180,8 @@ module	speechfifo(i_clk,
 	// transmit next.  Note, there's a clock delay between setting this 
 	// index and when the wb_data is valid.  Hence, we set the index on
 	// restart[0] to zero.
-	reg	[10:0]	msg_index;
-	initial	msg_index = 11'd2040;
+	reg	[11:0]	msg_index;
+	initial	msg_index = 12'h000 - 12'h8;
 	always @(posedge i_clk)
 	begin
 		if (restart)
@@ -231,7 +236,7 @@ module	speechfifo(i_clk,
 		if (restart)
 			end_of_message <= 1'b0;
 		else
-			end_of_message <= (msg_index >= 1481);
+			end_of_message <= (msg_index >= MSGLEN);
 
 	// The wb_stb signal indicates that we wish to write, using the wishbone
 	// to our peripheral.  We have two separate types of writes.  First,
