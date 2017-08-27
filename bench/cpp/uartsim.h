@@ -79,6 +79,10 @@ class	UARTSIM	{
 	// related setup stuff.
 	void	setup_listener(const int port);
 
+	// Call check_for_new_connections() to see if we can accept a new
+	// network socket connection to our device
+	void	check_for_new_connections(void);
+
 	// nettick() gets called if we are connected to a network, and
 	int	nettick(const int i_tx);
 	// fdtick() if we are not.
