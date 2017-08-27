@@ -75,6 +75,7 @@ FBDIR := .
 VDIRFB:= $(FBDIR)/obj_dir
 RTLDR := ../../rtl
 VERILATOR := verilator
+VFLAGS := -Wall --MMD --trace -y ../../rtl -cc
 
 .PHONY: test testline testhello speechfifo
 test: testline testhello speechfifo
@@ -100,7 +101,7 @@ $(VDIRFB)/Vspeechfifo__ALL.a: $(VDIRFB)/Vspeechfifo.mk
 $(SPEECHVFILES): speechfifo.v $(SPEECHSRCS)
 
 $(VDIRFB)/V%.cpp $(VDIRFB)/V%.h $(VDIRFB)/V%.mk: $(FBDIR)/%.v
-	$(VERILATOR) -Wall --trace -cc -y ../../rtl $*.v
+	$(VERILATOR) $(VFLAGS) $*.v
 
 $(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.mk
 	cd $(VDIRFB); make -f V$*.mk
@@ -112,3 +113,7 @@ clean:
 	rm -rf $(VDIRFB)/*.h
 	rm -rf $(VDIRFB)/
 
+DIRS := $(wildcard $(VDIRFB)/*.d)
+ifneq ($(DIRS),)
+-include $(DIRS)
+endif
