@@ -49,13 +49,8 @@ SOLVER  := -s yices
 BMCARGS := $(SOLVER)
 INDARGS := $(SOLVER) -i
 
-FIFO    := ufifo
-FIFOBMC := $(FIFO)_bmc
-FIFOIND := $(FIFO)_ind
-
+FIFO  := ufifo
 TX    := txuartlite
-TXBMC := $(TX)_bmc
-TXIND := $(TX)_ind
 
 $(FIFO).smt2: $(RTL)/$(FIFO).v
 	yosys -ql $(FIFO).yslog -s $(FIFO).ys
@@ -65,19 +60,19 @@ $(TX).smt2: $(RTL)/$(TX).v
 
 $(FIFO) : $(FIFO).check
 $(FIFO).check: $(FIFO).smt2
-	$(SMTBMC) --presat $(BMCARGS) -t 24 --dump-smt2 $(FIFOBMC).smt2 --dump-vcd $(FIFOBMC).vcd $(FIFO).smt2
-	$(SMTBMC) $(INDARGS) -t 24 --dump-smt2 $(FIFOIND).smt2 --dump-vcd $(FIFOIND).vcd $(FIFO).smt2
+	$(SMTBMC) --presat $(BMCARGS) -t 24 --dump-vcd $(FIFO).vcd $(FIFO).smt2
+	$(SMTBMC)          $(INDARGS) -t 24 --dump-vcd $(FIFO).vcd $(FIFO).smt2
 	touch $@
 
 $(TX) : $(TX).check
 $(TX).check: $(TX).smt2
-	$(SMTBMC) --presat $(BMCARGS) -t 200 --dump-smt2 $(TXBMC).smt2 --dump-vcd $(TXBMC).vcd $(TX).smt2
-	$(SMTBMC) $(INDARGS) -t 200 --dump-smt2 $(TXIND).smt2 --dump-vcd $(TXIND).vcd $(TX).smt2
+	$(SMTBMC) --presat $(BMCARGS) -t 200 --dump-vcd $(TX).vcd $(TX).smt2
+	$(SMTBMC)          $(INDARGS) -t 200 --dump-vcd $(TX).vcd $(TX).smt2
 	touch $@
 
 
 .PHONY: clean
 clean:
-	rm -f  $(FIFO).smt2  $(FIFOBMC).smt2  $(FIFOIND).smt2  $(FIFO)*.vcd
-	rm -f  $(TX).smt2  $(TXBMC).smt2  $(TXIND).smt2  $(TX)*.vcd
+	rm -f  $(FIFO).smt2 $(FIFO)*.vcd
+	rm -f  $(TX).smt2   $(TX)*.vcd
 	rm -f *.check
