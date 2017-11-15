@@ -14,7 +14,7 @@
 //	high for one cycle, and your data will be off.  Wait until the 'o_busy'
 //	line is low before strobing the i_wr line again--this implementation
 //	has NO BUFFER, so strobing i_wr while the core is busy will just
-//	get ignored.  The output will be placed on the o_txuart output line. 
+//	get ignored.  The output will be placed on the o_txuart output line.
 //
 //	(I often set both data and strobe on the same clock, and then just leave
 //	them set until the busy line is low.  Then I move on to the next piece
@@ -64,7 +64,7 @@
 //
 //
 module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
-	parameter	[23:0]	CLOCKS_PER_BAUD = 24'd868;
+	parameter	[23:0]	CLOCKS_PER_BAUD = 24'd8; // 24'd868;
 	input	wire		i_clk;
 	input	wire		i_wr;
 	input	wire	[7:0]	i_data;
@@ -102,7 +102,7 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 				state <= state + 1;
 			else
 				state <= `TXUL_IDLE;
-		end 
+		end
 	end
 
 	// o_busy
@@ -203,5 +203,126 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 		else
 			baud_counter <= CLOCKS_PER_BAUD - 24'h01;
 	end
+
+//
+//
+// FORMAL METHODS
+//
+//
+//
+`ifdef	FORMAL
+
+`ifdef	TXUARTLITE
+`define	ASSUME	assume
+`else
+`define	ASSUME	assert
+`endif
+
+	// Setup
+
+	reg	f_past_valid, f_last_clk;
+
+	always @($global_clock)
+	begin
+		restrict(i_clk == !f_last_clk);
+		f_last_clk <= i_clk;
+		if (!$rose(i_clk))
+		begin
+			`ASSUME($stable(i_wr));
+			`ASSUME($stable(i_data));
+		end
+	end
+
+	initial	f_past_valid = 1'b0;
+	always @(posedge i_clk)
+		f_past_valid <= 1'b1;
+
+	always @(posedge i_clk)
+		if ((f_past_valid)&&($past(i_wr))&&($past(o_busy)))
+		begin
+			`ASSUME(i_wr   == $past(i_wr));
+			`ASSUME(i_data == $past(i_data));
+		end
+
+	// Check the baud counter
+	always @(posedge i_clk)
+		if (zero_baud_counter)
+			assert(baud_counter == 0);
+
+	always @(posedge i_clk)
+		if ((f_past_valid)&&($past(baud_counter != 0))&&($past(state != `TXUL_IDLE)))
+			assert(baud_counter == $past(baud_counter - 1'b1));
+
+	always @(posedge i_clk)
+		if ((f_past_valid)&&(!$past(zero_baud_counter))&&($past(state != `TXUL_IDLE)))
+			assert($stable(o_uart_tx));
+
+	reg	[23:0]	f_baud_count;
+	initial	f_baud_count = 1'b0;
+	always @(posedge i_clk)
+		if (zero_baud_counter)
+			f_baud_count <= 0;
+		else
+			f_baud_count <= f_baud_count + 1'b1;
+
+	always @(posedge i_clk)
+		assert(f_baud_count < CLOCKS_PER_BAUD);
+
+	always @(posedge i_clk)
+		if (baud_counter != 0)
+			assert(o_busy);
+
+	reg	[9:0]	f_txbits;
+	initial	f_txbits = 0;
+	always @(posedge i_clk)
+		if (zero_baud_counter)
+			f_txbits <= { o_uart_tx, f_txbits[9:1] };
+
+	reg	[3:0]	f_bitcount;
+	initial	f_bitcount = 0;
+	always @(posedge i_clk)
+		//if (baud_counter == CLOCKS_PER_BAUD - 24'h01)
+			//f_bitcount <= f_bitcount + 1'b1;
+		if ((!f_past_valid)||(!$past(f_past_valid)))
+			f_bitcount <= 0;
+		else if ((state == `TXUL_IDLE)&&(zero_baud_counter))
+			f_bitcount <= 0;
+		else if (zero_baud_counter)
+			f_bitcount <= f_bitcount + 1'b1;
+
+	always @(posedge i_clk)
+		assert(f_bitcount <= 4'ha);
+
+	reg	[7:0]	f_request_tx_data;
+	always @(posedge i_clk)
+		if ((i_wr)&&(!o_busy))
+			f_request_tx_data <= i_data;
+
+	wire	[3:0]	subcount;
+	assign	subcount = 10-f_bitcount;
+	always @(posedge i_clk)
+		if (f_bitcount > 0)
+			assert(!f_txbits[subcount]);
+/*
+
+	always @(posedge i_clk)
+		if ((f_bitcount > 2)&&(f_bitcount <= 10))
+			assert(f_txbits[f_bitcount-2:0]
+				== f_request_tx_data[7:(9-f_bitcount)]);
+*/
+
+	always @(posedge i_clk)
+		if (f_bitcount == 4'ha)
+		begin
+			assert(f_txbits[8:1] == f_request_tx_data);
+			assert( f_txbits[9]);
+		end
+
+	always @(posedge i_clk)
+		assert((state <= `TXUL_STOP + 1'b1)||(state == `TXUL_IDLE));
+//
+//
+
+`endif	// FORMAL
 endmodule
 

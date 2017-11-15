@@ -1,0 +1,4 @@
+*.smt2
+*.check
+*.vcd
+*.yslog

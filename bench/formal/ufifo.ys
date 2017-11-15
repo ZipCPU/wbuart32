@@ -1,0 +1,5 @@
+read_verilog -D UFIFO -formal ../../rtl/ufifo.v
+prep -top ufifo -nordff
+clk2fflogic
+opt -share_all
+write_smt2 -wires ufifo.smt2

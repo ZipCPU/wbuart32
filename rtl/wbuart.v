@@ -62,17 +62,12 @@ module	wbuart(i_clk, i_rst,
 	localparam [3:0]	LCLLGFLEN = (LGFLEN > 4'ha)? 4'ha
 					: ((LGFLEN < 4'h2) ? 4'h2 : LGFLEN);
 	//
-	/* verilator lint_off UNUSED */
-	input	wire		i_clk;
-	/* verilator lint_on UNUSED */
-	input	wire		i_rst;
+	input	wire		i_clk, i_rst;
 	// Wishbone inputs
-	/* verilator lint_off UNUSED */
 	input	wire		i_wb_cyc;	// We ignore CYC for efficiency
-	input	wire	[31:0]	i_wb_data;	// and only use 30 lines here
-	/* verilator lint_on UNUSED */
 	input	wire		i_wb_stb, i_wb_we;
 	input	wire	[1:0]	i_wb_addr;
+	input	wire	[31:0]	i_wb_data;	// and only use 30 lines here
 	output	reg		o_wb_ack;
 	output	wire		o_wb_stall;
 	output	reg	[31:0]	o_wb_data;
@@ -427,5 +422,11 @@ module	wbuart(i_clk, i_rst,
 	// perhaps, but doesn't stall the pipeline.)  Hence, we can just
 	// set this value to zero.
 	assign	o_wb_stall = 1'b0;
+
+	// Make verilator happy
+	// verilator lint_off UNUSED
+	wire	[33:0] unused;
+	assign	unused = { i_rst, i_wb_cyc, i_wb_data };
+	// verilator lint_on UNUSED
 
 endmodule

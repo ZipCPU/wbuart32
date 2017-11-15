@@ -9,9 +9,9 @@
 //	write on the same clock, while maintaining the correct output FIFO
 //	parameters.  Two versions of the FIFO exist within this file, separated
 //	by the RXFIFO parameter's value.  One, where RXFIFO = 1, produces status
-//	values appropriate for reading and checking a read FIFO from logic, whereas
-//	the RXFIFO = 0 applies to writing to the FIFO from bus logic and reading
-//	it automatically any time the transmit UART is idle.
+//	values appropriate for reading and checking a read FIFO from logic,
+//	whereas the RXFIFO = 0 applies to writing to the FIFO from bus logic
+//	and reading it automatically any time the transmit UART is idle.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -118,7 +118,7 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 		if (i_rst)
 			will_underflow <= 1'b1;
 		else if (i_wr)
-			will_underflow <= (will_underflow)&&(i_rd);
+			will_underflow <= 1'b0;
 		else if (i_rd)
 			will_underflow <= (will_underflow)||(w_last_plus_one == r_first);
 		else
@@ -132,6 +132,7 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 	// reg		r_unfl;
 	// initial	r_unfl = 1'b0;
 	initial	r_last = 0;
+	initial	r_next = { {(LGFLEN-1){1'b0}}, 1'b1 };
 	always @(posedge i_clk)
 		if (i_rst)
 		begin
@@ -140,7 +141,7 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 			// r_unfl <= 1'b0;
 		end else if (i_rd)
 		begin
-			if ((i_wr)||(!will_underflow)) // (r_first != r_last)
+			if (!will_underflow) // (r_first != r_last)
 			begin
 				r_last <= r_next;
 				r_next <= r_last +{{(LGFLEN-2){1'b0}},2'b10};
@@ -183,10 +184,10 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 			r_empty_n <= 1'b0;
 		else casez({i_wr, i_rd, will_underflow})
 			3'b00?: r_empty_n <= (r_first != r_last);
-			3'b11?: r_empty_n <= (r_first != r_last);
-			3'b10?: r_empty_n <= 1'b1;
 			3'b010: r_empty_n <= (r_first != w_last_plus_one);
-			// 3'b001: r_empty_n <= 1'b0;
+			3'b10?: r_empty_n <= 1'b1;
+			3'b110: r_empty_n <= (r_first != r_last);
+			3'b111: r_empty_n <= 1'b1;
 			default: begin end
 		endcase
 
@@ -201,7 +202,13 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 	//
 	// Adjust for these differences here.
 	reg	[(LGFLEN-1):0]	r_fill;
-	initial	r_fill = 0;
+	generate
+	if (RXFIFO != 0)
+		initial	r_fill = 0;
+	else
+		initial	r_fill = -1;
+	endgenerate
+
 	always @(posedge i_clk)
 		if (RXFIFO!=0) begin
 			// Calculate the number of elements in our FIFO
@@ -211,9 +218,10 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 			// another context.
 			if (i_rst)
 				r_fill <= 0;
-			else case({(i_wr)&&(!will_overflow), (i_rd)&&(!will_underflow)})
-			2'b01:   r_fill <= r_first - r_next;
-			2'b10:   r_fill <= r_first - r_last + 1'b1;
+			else casez({(i_wr), (!will_overflow), (i_rd)&&(!will_underflow)})
+			3'b0?1:   r_fill <= r_first - r_next;
+			3'b110:   r_fill <= r_first - r_last + 1'b1;
+			3'b1?1:   r_fill <= r_first - r_last;
 			default: r_fill <= r_first - r_last;
 			endcase
 		end else begin
@@ -222,10 +230,10 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 			// not the fill, but (SIZE-1)-fill.
 			if (i_rst)
 				r_fill <= { (LGFLEN){1'b1} };
-			else case({i_wr, i_rd})
-			2'b01:   r_fill <= r_last - r_first;
-			2'b10:   r_fill <= r_last - w_first_plus_two;
-			default: r_fill <= r_last - w_first_plus_one;
+			else casez({i_wr, (!will_overflow), (i_rd)&&(!will_underflow)})
+			3'b0?1:   r_fill <= r_fill + 1'b1;
+			3'b110:   r_fill <= r_fill - 1'b1;
+			default: r_fill  <= r_fill;
 			endcase
 		end
 
@@ -235,13 +243,13 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 	wire	[3:0]	lglen;
 	assign lglen = LGFLEN;
 
+	wire	w_half_full;
 	wire	[9:0]	w_fill;
 	assign	w_fill[(LGFLEN-1):0] = r_fill;
 	generate if (LGFLEN < 10)
 		assign w_fill[9:(LGFLEN)] = 0;
 	endgenerate
 
-	wire	w_half_full;
 	assign	w_half_full = r_fill[(LGFLEN-1)];
 
 	assign	o_status = {
@@ -264,5 +272,103 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 	};
 
 	assign	o_empty_n = r_empty_n;
-	
+
+//
+//
+//
+// FORMAL METHODS
+//
+//
+//
+`ifdef	FORMAL
+
+`ifdef	UFIFO
+`define	ASSUME	assume
+`else
+`define	ASSUME	assert
+`endif
+
+//
+// Assumptions about our input(s)
+//
+//
+	reg	f_past_valid, f_last_clk;
+
+	initial restrict(i_rst);
+
+	always @($global_clock)
+	begin
+		restrict(i_clk == !f_last_clk);
+		f_last_clk <= i_clk;
+		if (!$rose(i_clk))
+		begin
+			`ASSUME($stable(i_rst));
+			`ASSUME($stable(i_wr));
+			`ASSUME($stable(i_data));
+			`ASSUME($stable(i_rd));
+		end
+	end
+
+	//
+	// Underflows are a very real possibility, should the user wish to
+	// read from this FIFO while it is empty.  Our parent module will need
+	// to deal with this.
+	//
+	// always @(posedge i_clk)
+	//	`ASSUME((!will_underflow)||(!i_rd)||(i_rst));
+//
+// Assertions about our outputs
+//
+//
+
+	initial	f_past_valid = 1'b0;
+	always @(posedge i_clk)
+		f_past_valid <= 1'b1;
+
+	wire	[(LGFLEN-1):0]	f_fill, f_next, f_empty;
+	assign	f_fill = r_first - r_last;
+	assign	f_empty = {(LGFLEN){1'b1}} -f_fill;
+	assign	f_next = r_last + 1'b1;
+	always @(posedge i_clk)
+	begin
+		if (RXFIFO)
+			assert(f_fill == r_fill);
+		else
+			assert(f_empty== r_fill);
+		if (f_fill == 0)
+		begin
+			assert(will_underflow);
+			assert(!o_empty_n);
+		end else begin
+			assert(!will_underflow);
+			assert(o_empty_n);
+		end
+
+		if (f_fill == {(LGFLEN){1'b1}})
+			assert(will_overflow);
+		else
+			assert(!will_overflow);
+
+		assert(r_next == f_next);
+	end
+
+	always @(posedge i_clk)
+	if (f_past_valid)
+	begin
+		if ($past(i_rst))
+			assert(!o_err);
+		else begin
+			// No underflow detection in this core
+			//
+			// if (($past(i_rd))&&($past(r_fill == 0)))
+			//	assert(o_err);
+			//
+			// We do, though, have overflow detection
+			if (($past(i_wr))&&(!$past(i_rd))
+					&&($past(will_overflow)))
+				assert(o_err);
+		end
+	end
+
+`endif
 endmodule
