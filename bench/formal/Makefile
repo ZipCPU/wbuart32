@@ -51,12 +51,16 @@ INDARGS := $(SOLVER) -i
 
 FIFO  := ufifo
 TX    := txuartlite
+RX    := rxuartlite
 
-$(FIFO).smt2: $(RTL)/$(FIFO).v
+$(FIFO).smt2: $(RTL)/$(FIFO).v $(FIFO).ys
 	yosys -ql $(FIFO).yslog -s $(FIFO).ys
 
-$(TX).smt2: $(RTL)/$(TX).v
+$(TX).smt2: $(RTL)/$(TX).v $(TX).ys
 	yosys -ql $(TX).yslog -s $(TX).ys
+
+$(RX).smt2: $(RTL)/$(RX).v $(RX).ys
+	yosys -ql $(RX).yslog -s $(RX).ys
 
 $(FIFO) : $(FIFO).check
 $(FIFO).check: $(FIFO).smt2
@@ -68,6 +72,12 @@ $(TX) : $(TX).check
 $(TX).check: $(TX).smt2
 	$(SMTBMC) --presat $(BMCARGS) -t 200 --dump-vcd $(TX).vcd $(TX).smt2
 	$(SMTBMC)          $(INDARGS) -t 200 --dump-vcd $(TX).vcd $(TX).smt2
+	touch $@
+
+$(RX) : $(RX).check
+$(RX).check: $(RX).smt2
+	$(SMTBMC) --presat $(BMCARGS) -t 150 --dump-vcd $(RX).vcd $(RX).smt2
+	$(SMTBMC)          $(INDARGS) -t 150 --dump-vcd $(RX).vcd $(RX).smt2
 	touch $@
 
 
