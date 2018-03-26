@@ -64,14 +64,14 @@ $(RX).smt2: $(RTL)/$(RX).v $(RX).ys
 
 $(FIFO) : $(FIFO).check
 $(FIFO).check: $(FIFO).smt2
-	$(SMTBMC) --presat $(BMCARGS) -t 24 --dump-vcd $(FIFO).vcd $(FIFO).smt2
-	$(SMTBMC)          $(INDARGS) -t 24 --dump-vcd $(FIFO).vcd $(FIFO).smt2
+	$(SMTBMC) --presat $(BMCARGS) -t 10 --dump-vcd $(FIFO).vcd $(FIFO).smt2
+	$(SMTBMC)          $(INDARGS) -t 10 --dump-vcd $(FIFO).vcd $(FIFO).smt2
 	touch $@
 
 $(TX) : $(TX).check
 $(TX).check: $(TX).smt2
-	$(SMTBMC) --presat $(BMCARGS) -t 200 --dump-vcd $(TX).vcd $(TX).smt2
-	$(SMTBMC)          $(INDARGS) -t 200 --dump-vcd $(TX).vcd $(TX).smt2
+	$(SMTBMC) --presat $(BMCARGS) -t 90 --dump-vcd $(TX).vcd $(TX).smt2
+	$(SMTBMC)          $(INDARGS) -t 90 --dump-vcd $(TX).vcd $(TX).smt2
 	touch $@
 
 $(RX) : $(RX).check
