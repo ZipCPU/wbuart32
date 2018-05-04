@@ -77,7 +77,7 @@ void	UARTSIM::setup_listener(const int port) {
 	// any/every one of them.
 	my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	my_addr.sin_port = htons(port);
-	
+
 	if (bind(m_skt, (struct sockaddr *)&my_addr, sizeof(my_addr))!=0) {
 		perror("ERR: BIND FAILED:");
 		exit(EXIT_FAILURE);
@@ -152,10 +152,11 @@ void	UARTSIM::check_for_new_connections(void) {
 
 }
 
-int	UARTSIM::nettick(int i_tx) {
+int	UARTSIM::rawtick(const int i_tx, const bool network) {
 	int	o_rx = 1, nr = 0;
 
-	check_for_new_connections();
+	if (network)
+		check_for_new_connections();
 
 	if ((!i_tx)&&(m_last_tx))
 		m_rx_changectr = 0;
@@ -176,112 +177,11 @@ int	UARTSIM::nettick(int i_tx) {
 			if (m_conwr >= 0) {
 				char	buf[1];
 				buf[0] = (m_rx_data >> (32-m_nbits-m_nstop-m_nparity))&0x0ff;
-				if (1 != send(m_conwr, buf, 1, 0)) {
+				if ((network)&&(1 != send(m_conwr, buf, 1, 0))) {
 					close(m_conwr);
 					m_conrd = m_conwr = -1;
 					fprintf(stderr, "Failed write, connection closed\n");
-				}
-			}
-		} else {
-			m_rx_busy = (m_rx_busy << 1)|1;
-			// Low order bit is transmitted first, in this
-			// order:
-			//	Start bit (1'b1)
-			//	bit 0
-			//	bit 1
-			//	bit 2
-			//	...
-			//	bit N-1
-			//	(possible parity bit)
-			//	stop bit
-			//	(possible secondary stop bit)
-			m_rx_data = ((i_tx&1)<<31) | (m_rx_data>>1);
-		} m_rx_baudcounter = m_baud_counts-1;
-	} else
-		m_rx_baudcounter--;
-
-	if (m_tx_state == TXIDLE) {
-		struct	pollfd	pb;
-		pb.fd = m_conrd;
-		pb.events = POLLIN;
-		if (poll(&pb, 1, 0) < 0)
-			perror("Polling error:");
-		if (pb.revents & POLLIN) {
-			char	buf[1];
-			if (1 == (nr = recv(m_conrd, buf, 1, MSG_DONTWAIT))) {
-				m_tx_data = (-1<<(m_nbits+m_nparity+1))
-					// << nstart_bits
-					|((buf[0]<<1)&0x01fe);
-				if (m_nparity) {
-					int	p;
-
-					// If m_nparity is set, we need to then
-					// create the parity bit.
-					if (m_fixdp)
-						p = m_evenp;
-					else {
-						p = (m_tx_data >> 1)&0x0ff;
-						p = p ^ (p>>4);
-						p = p ^ (p>>2);
-						p = p ^ (p>>1);
-						p &= 1;
-						p ^= m_evenp;
-					}
-					m_tx_data |= (p<<(m_nbits+m_nparity));
-				}
-				m_tx_busy = (1<<(m_nbits+m_nparity+m_nstop+1))-1;
-				m_tx_state = TXDATA;
-				o_rx = 0;
-				m_tx_baudcounter = m_baud_counts-1;
-			} else if (nr == 0) {
-				close(m_conrd);
-				m_conrd = m_conwr = -1;
-				// printf("Closing network connection\n");
-			} else if (nr < 0) {
-				perror("O/S Read err:");
-				close(m_conrd);
-				m_conrd = m_conwr = -1;
-			}
-		}
-	} else if (m_tx_baudcounter <= 0) {
-		m_tx_data >>= 1;
-		m_tx_busy >>= 1;
-		if (!m_tx_busy)
-			m_tx_state = TXIDLE;
-		else
-			m_tx_baudcounter = m_baud_counts-1;
-		o_rx = m_tx_data&1;
-	} else {
-		m_tx_baudcounter--;
-		o_rx = m_tx_data&1;
-	}
-
-	return o_rx;
-}
-
-int	UARTSIM::fdtick(int i_tx) {
-	int	o_rx = 1;
-
-	if ((!i_tx)&&(m_last_tx))
-		m_rx_changectr = 0;
-	else	m_rx_changectr++;
-	m_last_tx = i_tx;
-
-	if (m_rx_state == RXIDLE) {
-		if (!i_tx) {
-			m_rx_state = RXDATA;
-			m_rx_baudcounter =m_baud_counts+m_baud_counts/2-1;
-			m_rx_baudcounter -= m_rx_changectr;
-			m_rx_busy    = 0;
-			m_rx_data    = 0;
-		}
-	} else if (m_rx_baudcounter <= 0) {
-		if (m_rx_busy >= (1<<(m_nbits+m_nparity+m_nstop-1))) {
-			m_rx_state = RXIDLE;
-			if (m_conwr >= 0) {
-				char	buf[1];
-				buf[0] = (m_rx_data >> (32-m_nbits-m_nstop-m_nparity))&0x0ff;
-				if (1 != write(m_conwr, buf, 1)) {
+				} else if ((!network)&&(1 != write(m_conwr, buf, 1))) {
 					fprintf(stderr, "ERR while attempting to write out--closing output port\n");
 					perror("UARTSIM::write() ");
 					m_conrd = m_conwr = -1;
@@ -305,16 +205,21 @@ int	UARTSIM::fdtick(int i_tx) {
 	} else
 		m_rx_baudcounter--;
 
-	if ((m_tx_state == TXIDLE)&&(m_conrd >= 0)) {
+	if ((m_tx_state == TXIDLE)&&((network)||(m_conrd >= 0))) {
 		struct	pollfd	pb;
 		pb.fd = m_conrd;
 		pb.events = POLLIN;
 		if (poll(&pb, 1, 0) < 0)
 			perror("Polling error:");
+
 		if (pb.revents & POLLIN) {
 			char	buf[1];
-			int	nr;
-			if (1==(nr = read(m_conrd, buf, 1))) {
+
+			if (network)
+				nr = recv(m_conrd, buf, 1, MSG_DONTWAIT);
+			else
+				nr = read(m_conrd, buf, 1);
+			if (1 == nr) {
 				m_tx_data = (-1<<(m_nbits+m_nparity+1))
 					// << nstart_bits
 					|((buf[0]<<1)&0x01fe);
@@ -339,14 +244,23 @@ int	UARTSIM::fdtick(int i_tx) {
 				m_tx_state = TXDATA;
 				o_rx = 0;
 				m_tx_baudcounter = m_baud_counts-1;
+			} else if ((network)&&(nr == 0)) {
+				close(m_conrd);
+				m_conrd = m_conwr = -1;
+				// printf("Closing network connection\n");
 			} else if (nr < 0) {
-				fprintf(stderr, "ERR while attempting to read in--closing input port\n");
-				perror("UARTSIM::read() ");
-				m_conrd = -1;
-			} // and we really don't care if nr == 0 except that
-			// the poll above is supposed to keep it from happening
+				if (!network) {
+					fprintf(stderr, "ERR while attempting to read in--closing input port\n");
+					perror("UARTSIM::read() ");
+					m_conrd = -1;
+				} else {
+					perror("O/S Read err:");
+					close(m_conrd);
+					m_conrd = m_conwr = -1;
+				}
+			}
 		}
-	} else if (m_tx_baudcounter == 0) {
+	} else if (m_tx_baudcounter <= 0) {
 		m_tx_data >>= 1;
 		m_tx_busy >>= 1;
 		if (!m_tx_busy)
@@ -362,3 +276,10 @@ int	UARTSIM::fdtick(int i_tx) {
 	return o_rx;
 }
 
+int	UARTSIM::nettick(const int i_tx) {
+	return rawtick(i_tx, true);
+}
+
+int	UARTSIM::fdtick(const int i_tx) {
+	return rawtick(i_tx, false);
+}
