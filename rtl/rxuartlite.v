@@ -21,7 +21,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2017, Gisselquist Technology, LLC
+// Copyright (C) 2015-2018, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -59,7 +59,11 @@
 `define	RXUL_WAIT		4'h9
 `define	RXUL_IDLE		4'hf
 
-module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
+module rxuartlite(i_clk, i_uart_rx, o_wr, o_data
+`ifdef	FORMAL
+		, f_sub_baud_difference
+`endif
+		);
 	parameter	TIMER_BITS = 10;
 	parameter [(TIMER_BITS-1):0] CLOCKS_PER_BAUD = 868;
 	localparam	TB = TIMER_BITS;
@@ -67,6 +71,10 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	input	wire		i_uart_rx;
 	output	reg		o_wr;
 	output	reg	[7:0]	o_data;
+`ifdef	FORMAL
+	localparam	F_CKRES = 10;
+	output	wire	[(TB+4+F_CKRES-1):0]	f_sub_baud_difference;
+`endif
 
 
 	wire	[(TB-1):0]	half_baud;
@@ -203,7 +211,16 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 `endif
 
 `ifdef	FORMAL
-	localparam	F_CKRES = 10;
+
+`define PHASE_TWO
+`define	PHASE_ONE_ASSERT	assert
+`define	PHASE_TWO_ASSERT	assert
+
+`ifdef	PHASE_TWO
+`undef	PHASE_ONE_ASSERT
+`define	PHASE_ONE_ASSERT	assume
+`endif
+
 
 	wire			f_tx_start, f_tx_busy;
 	wire	[(F_CKRES-1):0]	f_tx_step;
@@ -221,9 +238,13 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 
 
 	wire			f_txclk;
-// `ifdef	RXUARTLITE
 	reg	[1:0]		f_rx_clock;
 	reg	[(F_CKRES-1):0]	f_tx_clock;
+	reg			f_past_valid, f_past_valid_tx;
+
+	initial	f_past_valid = 1'b0;
+	always @(posedge i_clk)
+		f_past_valid <= 1'b1;
 
 	initial	f_rx_clock = 3'h0;
 	always @($global_clock)
@@ -232,24 +253,36 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	always @(*)
 		assume(i_clk == f_rx_clock[1]);
 
+
+
+	///////////////////////////////////////////////////////////
+	//
+	//
+	// Generate a transmitted signal
+	//
+	//
+	///////////////////////////////////////////////////////////
+
+
+	// First, calculate the transmit clock
 	localparam [(F_CKRES-1):0] F_MIDSTEP = { 2'b01, {(F_CKRES-2){1'b0}} };
 	//
 	// Need to allow us to slip by half a baud clock over 10 baud intervals
 	//
 	// (F_STEP / (2^F_CKRES)) * (CLOCKS_PER_BAUD)*10 < CLOCKS_PER_BAUD/2
-	// F_STEP * 2 * 10 < 1
-	localparam [(F_CKRES-1):0] F_HALFSTEP= F_MIDSTEP/20;
-	localparam [(F_CKRES-1):0] F_MINSTEP = F_MIDSTEP - F_HALFSTEP + ((F_HALFSTEP>0)? 1:0);
-	localparam [(F_CKRES-1):0] F_MAXSTEP = F_MIDSTEP + F_HALFSTEP - ((F_HALFSTEP>0)? 1:0);
+	// F_STEP * 2 * 10 < 2^F_CKRES
+	localparam [(F_CKRES-1):0] F_HALFSTEP= F_MIDSTEP/32;
+	localparam [(F_CKRES-1):0] F_MINSTEP = F_MIDSTEP - F_HALFSTEP + 1;
+	localparam [(F_CKRES-1):0] F_MAXSTEP = F_MIDSTEP + F_HALFSTEP - 1;
 
 	initial assert(F_MINSTEP <= F_MIDSTEP);
 	initial assert(F_MIDSTEP <= F_MAXSTEP);
 
 	assign	f_tx_step = $anyconst;
-	// assume property((f_tx_step >= F_MINSTEP)&&(f_tx_step <= F_MAXSTEP));
+	//	assume((f_tx_step >= F_MINSTEP)&&(f_tx_step <= F_MAXSTEP));
 	//
 	//
-	initial assume((f_tx_step == F_MINSTEP)
+	always @(*) assume((f_tx_step == F_MINSTEP)
 			||(f_tx_step == F_MIDSTEP)
 			||(f_tx_step == F_MAXSTEP));
 
@@ -259,44 +292,13 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 
 	assign	f_txclk = f_tx_clock[F_CKRES-1];
 
-`define	ASSUME	assume
-// `else
-// `define	ASSUME	assert
-// `endif
-
-	reg	f_past_valid, f_past_valid_tx;
-	initial	f_past_valid = 1'b0;
-	always @(posedge i_clk)
-		f_past_valid <= 1'b1;
+	// 
 	initial	f_past_valid_tx = 1'b0;
 	always @(posedge f_txclk)
 		f_past_valid_tx <= 1'b1;
 
-// `define	PHASE_ONE	assert
-`define	PHASE_ONE	assume
-	always @(*)
-		`PHASE_ONE( ((!zero_baud_counter)&&(state == `RXUL_IDLE)
-				&&(baud_counter == 0))
-			||((zero_baud_counter)&&(baud_counter == 0))
-			||((!zero_baud_counter)&&(baud_counter != 0)));
+	initial	assume(i_uart_rx);
 
-	always @(posedge i_clk)
-	if (!f_past_valid)
-		`PHASE_ONE((state == `RXUL_IDLE)&&(baud_counter == 0)
-			&&(zero_baud_counter));
-
-	always @(posedge f_txclk)
-	if (!f_past_valid_tx)
-		`PHASE_ONE((state == `RXUL_IDLE)&&(baud_counter == 0)
-			&&(zero_baud_counter)&&(!f_tx_busy));
-
-	always @(posedge i_clk)
-	if ((f_past_valid)&&($past(state)==`RXUL_IDLE)&&(state == `RXUL_IDLE))
-	begin
-		`PHASE_ONE(($past(ck_uart))
-			||(chg_counter <=
-				{ 1'b0, CLOCKS_PER_BAUD[(TB-1):1] }));
-	end
 
 	//////////////////////////////////////////////
 	//
@@ -325,70 +327,31 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 		f_tx_baud <= f_tx_baud - 1'b1;
 
 	always @(*)
-		`PHASE_ONE(f_tx_baud < CLOCKS_PER_BAUD);
+		`PHASE_ONE_ASSERT(f_tx_baud < CLOCKS_PER_BAUD);
 
 	always @(*)
 	if (!f_tx_busy)
-		`PHASE_ONE(f_tx_baud == 0);
+		`PHASE_ONE_ASSERT(f_tx_baud == 0);
 
 	assign	f_tx_zbaud = (f_tx_baud == 0);
 
-	/*
-	// Need to relate baud_counter to the formal f_tx_baud counter
-	always @(*)
-		if ((f_tx_baud > 0)&&(f_tx_baud < CLOCKS_PER_BAUD-1'b1))
-		if (f_tx_baud < baud_counter)
-	*/
-
-	initial	f_rx_count = 0;
-	always @(posedge i_clk)
-	if (state == `RXUL_IDLE)
-		f_rx_count = (!ck_uart) ? chg_counter : 0;
-	else
-		f_rx_count <= f_rx_count + 1'b1;
-	always @(posedge i_clk)
-	if (state == 0)
-		assert(f_rx_count
-				== half_baud + (CLOCKS_PER_BAUD-baud_counter)-2);
-	else if (state == 1)
-		assert(f_rx_count == half_baud + 2 * CLOCKS_PER_BAUD
-					- baud_counter - 2);
-	else if (state == 2)
-		assert(f_rx_count == half_baud + 3 * CLOCKS_PER_BAUD
-					- baud_counter -2 );
-	else if (state == 3)
-		assert(f_rx_count == half_baud + 4 * CLOCKS_PER_BAUD
-					- baud_counter -2 );
-	else if (state == 4)
-		assert(f_rx_count == half_baud + 5 * CLOCKS_PER_BAUD
-					- baud_counter -2 );
-	else if (state == 5)
-		assert(f_rx_count == half_baud + 6 * CLOCKS_PER_BAUD
-					- baud_counter -2 );
-	else if (state == 6)
-		assert(f_rx_count == half_baud + 7 * CLOCKS_PER_BAUD
-					- baud_counter -2 );
-	else if (state == 7)
-		assert(f_rx_count == half_baud + 8 * CLOCKS_PER_BAUD
-					- baud_counter -2 );
-	else if (state == 8)
-		assert((f_rx_count == half_baud + 9 * CLOCKS_PER_BAUD
-					- baud_counter -2 )
-			||(f_rx_count == half_baud + 10 * CLOCKS_PER_BAUD
-					- baud_counter -2 ));
-
+	// Pick some data to transmit
 	assign	f_tx_data = $anyseq;
 
+	// But only if we aren't busy
+	initial	assume(f_tx_data == 0);
 	always @(posedge f_txclk)
 	if ((!f_tx_zbaud)||(f_tx_busy)||(!f_tx_start))
 		assume(f_tx_data == $past(f_tx_data));
 
+	// Force the data to change on a clock only
 	always @($global_clock)
 	if ((f_past_valid)&&(!$rose(f_txclk)))
 		assume($stable(f_tx_data));
 	else if (f_tx_busy)
 		assume($stable(f_tx_data));
 
+	//
 	always @($global_clock)
 	if ((!f_past_valid)||(!$rose(f_txclk)))
 	begin
@@ -396,21 +359,27 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 		assume($stable(f_tx_data));
 	end
 
+	//
+	//
+	//
+
 	reg	[9:0]	f_tx_reg;
 	reg		f_tx_busy;
 
+	// Here's the transmitter itself (roughly)
 	initial	f_tx_busy   = 1'b0;
 	initial	f_tx_reg    = 0;
 	always @(posedge f_txclk)
 	if (!f_tx_zbaud)
 	begin
-		assert(f_tx_busy);
+		`PHASE_ONE_ASSERT(f_tx_busy);
 	end else begin
 		f_tx_reg  <= { 1'b0, f_tx_reg[9:1] };
 		if (f_tx_start)
 			f_tx_reg <= { 1'b1, f_tx_data, 1'b0 };
 	end
 
+	// Create a busy flag that we'll use
 	always @(*)
 	if (!f_tx_zbaud)
 		f_tx_busy <= 1'b1;
@@ -419,26 +388,29 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	else
 		f_tx_busy <= 1'b0;
 
+	//
+	// Tie the TX register to the TX data
 	always @(posedge f_txclk)
 	if (f_tx_reg[9])
-		assert(f_tx_reg[8:0] == { f_tx_data, 1'b0 });
+		`PHASE_ONE_ASSERT(f_tx_reg[8:0] == { f_tx_data, 1'b0 });
 	else if (f_tx_reg[8])
-		assert(f_tx_reg[7:0] == f_tx_data[7:0] );
+		`PHASE_ONE_ASSERT(f_tx_reg[7:0] == f_tx_data[7:0] );
 	else if (f_tx_reg[7])
-		assert(f_tx_reg[6:0] == f_tx_data[7:1] );
+		`PHASE_ONE_ASSERT(f_tx_reg[6:0] == f_tx_data[7:1] );
 	else if (f_tx_reg[6])
-		assert(f_tx_reg[5:0] == f_tx_data[7:2] );
+		`PHASE_ONE_ASSERT(f_tx_reg[5:0] == f_tx_data[7:2] );
 	else if (f_tx_reg[5])
-		assert(f_tx_reg[4:0] == f_tx_data[7:3] );
+		`PHASE_ONE_ASSERT(f_tx_reg[4:0] == f_tx_data[7:3] );
 	else if (f_tx_reg[4])
-		assert(f_tx_reg[3:0] == f_tx_data[7:4] );
+		`PHASE_ONE_ASSERT(f_tx_reg[3:0] == f_tx_data[7:4] );
 	else if (f_tx_reg[3])
-		assert(f_tx_reg[2:0] == f_tx_data[7:5] );
+		`PHASE_ONE_ASSERT(f_tx_reg[2:0] == f_tx_data[7:5] );
 	else if (f_tx_reg[2])
-		assert(f_tx_reg[1:0] == f_tx_data[7:6] );
+		`PHASE_ONE_ASSERT(f_tx_reg[1:0] == f_tx_data[7:6] );
 	else if (f_tx_reg[1])
-		assert(f_tx_reg[0] == f_tx_data[7]);
+		`PHASE_ONE_ASSERT(f_tx_reg[0] == f_tx_data[7]);
 
+	// Our counter since we start
 	initial	f_tx_count = 0;
 	always @(posedge f_txclk)
 	if (!f_tx_busy)
@@ -446,119 +418,262 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	else
 		f_tx_count <= f_tx_count + 1'b1;
 
+	always @(*)
+	if (f_tx_reg == 10'h0)
+		assume(i_uart_rx);
+	else
+		assume(i_uart_rx == f_tx_reg[0]);
+
+	//
+	// Make sure the absolute transmit clock timer matches our state
+	//
 	always @(posedge f_txclk)
 	if (!f_tx_busy)
 	begin
 		if ((!f_past_valid_tx)||(!$past(f_tx_busy)))
-			`PHASE_ONE(f_tx_count == 0);
+			`PHASE_ONE_ASSERT(f_tx_count == 0);
 	end else if (f_tx_reg[9])
-		`PHASE_ONE(f_tx_count ==     CLOCKS_PER_BAUD -1 -f_tx_baud);
+		`PHASE_ONE_ASSERT(f_tx_count ==
+				    CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[8])
-		`PHASE_ONE(f_tx_count == 2 * CLOCKS_PER_BAUD -1 -f_tx_baud);
+		`PHASE_ONE_ASSERT(f_tx_count ==
+				2 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[7])
-		`PHASE_ONE(f_tx_count == 3 * CLOCKS_PER_BAUD -1 -f_tx_baud);
+		`PHASE_ONE_ASSERT(f_tx_count ==
+				3 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[6])
-		`PHASE_ONE(f_tx_count == 4 * CLOCKS_PER_BAUD -1 -f_tx_baud);
+		`PHASE_ONE_ASSERT(f_tx_count ==
+				4 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[5])
-		`PHASE_ONE(f_tx_count == 5 * CLOCKS_PER_BAUD -1 -f_tx_baud);
+		`PHASE_ONE_ASSERT(f_tx_count ==
+				5 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[4])
-		`PHASE_ONE(f_tx_count == 6 * CLOCKS_PER_BAUD -1 -f_tx_baud);
+		`PHASE_ONE_ASSERT(f_tx_count ==
+				6 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[3])
-		`PHASE_ONE(f_tx_count == 7 * CLOCKS_PER_BAUD -1 -f_tx_baud);
+		`PHASE_ONE_ASSERT(f_tx_count ==
+				7 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[2])
-		`PHASE_ONE(f_tx_count == 8 * CLOCKS_PER_BAUD -1 -f_tx_baud);
+		`PHASE_ONE_ASSERT(f_tx_count ==
+				8 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[1])
-		`PHASE_ONE(f_tx_count == 9 * CLOCKS_PER_BAUD -1 -f_tx_baud);
+		`PHASE_ONE_ASSERT(f_tx_count ==
+				9 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[0])
-		`PHASE_ONE(f_tx_count ==10 * CLOCKS_PER_BAUD -1 -f_tx_baud);
+		`PHASE_ONE_ASSERT(f_tx_count ==
+				10 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else
-		`PHASE_ONE(f_tx_count ==11 * CLOCKS_PER_BAUD -1 -f_tx_baud);
+		`PHASE_ONE_ASSERT(f_tx_count ==
+				11 * CLOCKS_PER_BAUD -1 -f_tx_baud);
+
+
+	///////////////////////////////////////
+	//
+	// Receiver
+	//
+	///////////////////////////////////////
+	//
+	// Count RX clocks since the start of the first stop bit, measured in
+	// rx clocks
+	initial	f_rx_count = 0;
+	always @(posedge i_clk)
+	if (state == `RXUL_IDLE)
+		f_rx_count = (!ck_uart) ? (chg_counter+2) : 0;
+	else
+		f_rx_count <= f_rx_count + 1'b1;
+	always @(posedge i_clk)
+	if (state == 0)
+		`PHASE_ONE_ASSERT(f_rx_count
+				== half_baud + (CLOCKS_PER_BAUD-baud_counter));
+	else if (state == 1)
+		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 2 * CLOCKS_PER_BAUD
+					- baud_counter);
+	else if (state == 2)
+		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 3 * CLOCKS_PER_BAUD
+					- baud_counter);
+	else if (state == 3)
+		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 4 * CLOCKS_PER_BAUD
+					- baud_counter);
+	else if (state == 4)
+		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 5 * CLOCKS_PER_BAUD
+					- baud_counter);
+	else if (state == 5)
+		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 6 * CLOCKS_PER_BAUD
+					- baud_counter);
+	else if (state == 6)
+		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 7 * CLOCKS_PER_BAUD
+					- baud_counter);
+	else if (state == 7)
+		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 8 * CLOCKS_PER_BAUD
+					- baud_counter);
+	else if (state == 8)
+		`PHASE_ONE_ASSERT((f_rx_count == half_baud + 9 * CLOCKS_PER_BAUD
+					- baud_counter)
+			||(f_rx_count == half_baud + 10 * CLOCKS_PER_BAUD
+					- baud_counter));
+
+	always @(*)
+		`PHASE_ONE_ASSERT( ((!zero_baud_counter)
+				&&(state == `RXUL_IDLE)
+				&&(baud_counter == 0))
+			||((zero_baud_counter)&&(baud_counter == 0))
+			||((!zero_baud_counter)&&(baud_counter != 0)));
+
+	always @(posedge i_clk)
+	if (!f_past_valid)
+		`PHASE_ONE_ASSERT((state == `RXUL_IDLE)&&(baud_counter == 0)
+			&&(zero_baud_counter));
+
+	always @(*)
+	begin
+		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h2);
+		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h4);
+		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h5);
+		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h6);
+		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h9);
+		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'ha);
+		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'hb);
+		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'hd);
+	end
+
 
 	// Calculate an absolute value of the difference between the two baud
 	// clocks
+`ifdef	PHASE_TWO
+	always @(posedge i_clk)
+	if ((f_past_valid)&&($past(state)==`RXUL_IDLE)&&(state == `RXUL_IDLE))
+	begin
+		`PHASE_TWO_ASSERT(($past(ck_uart))
+			||(chg_counter <=
+				{ 1'b0, CLOCKS_PER_BAUD[(TB-1):1] }));
+	end
+
+	always @(posedge f_txclk)
+	if (!f_past_valid_tx)
+		`PHASE_TWO_ASSERT((state == `RXUL_IDLE)&&(baud_counter == 0)
+			&&(zero_baud_counter)&&(!f_tx_busy));
+
+	wire	[(TB+3):0]	f_tx_count_two_clocks_ago;
+	assign	f_tx_count_two_clocks_ago = f_tx_count - 2;
 	always @(*)
 	if (f_tx_count >= f_rx_count + 2)
-		f_baud_difference = f_tx_count - f_rx_count - 2;
+		f_baud_difference = f_tx_count_two_clocks_ago - f_rx_count;
 	else
-		f_baud_difference = f_rx_count +2 - f_tx_count;
+		f_baud_difference = f_rx_count - f_tx_count_two_clocks_ago;
+
+	localparam	F_SYNC_DLY = 8;
+
+	reg	[F_CKRES-1:0]	ck_tx_clock;
+	reg	[((F_SYNC_DLY-1)*F_CKRES)-1:0]	q_tx_clock;
+	reg	[TB+3:0]	ck_tx_count;
+	reg	[(F_SYNC_DLY-1)*(TB+4)-1:0]	q_tx_count;
+	initial	q_tx_count = 0;
+	initial	ck_tx_count = 0;
+	initial	q_tx_clock = 0;
+	initial	ck_tx_clock = 0;
+	always @($global_clock)
+		{ ck_tx_clock, q_tx_clock } <= { q_tx_clock, f_tx_clock };
+	always @($global_clock)
+		{ ck_tx_count, q_tx_count } <= { q_tx_count, f_tx_count };
+
+
+	wire	[TB+4+F_CKRES-1:0]	f_ck_tx_time, f_rx_time;
+	always @(*)
+		f_ck_tx_time = { ck_tx_count, !ck_tx_clock[F_CKRES-1],
+						ck_tx_clock[F_CKRES-2:0] };
+	always @(*)
+		f_rx_time = { f_rx_count, !f_rx_clock[1], f_rx_clock[0],
+						{(F_CKRES-2){1'b0}} };
+
+	wire	[TB+4+F_CKRES-1:0]	f_signed_difference;
+	always @(*)
+		f_signed_difference = f_ck_tx_time - f_rx_time;
 
 	always @(*)
-	if ((state != 4'hf)&&(state != `RXUL_WAIT))
-		assert(f_baud_difference <= 5 + half_baud);
+	if (f_signed_difference[TB+4+F_CKRES-1])
+		f_sub_baud_difference = -f_signed_difference;
+	else
+		f_sub_baud_difference =  f_signed_difference;
 
 	always @($global_clock)
 	if (state == `RXUL_IDLE)
 	begin
-		assert((!f_tx_busy)||(f_tx_reg[9]));
+		`PHASE_TWO_ASSERT((!f_tx_busy)||(f_tx_reg[9]));
 		if (!ck_uart)
-			assert(f_baud_difference <= 3 + CLOCKS_PER_BAUD/20);
+			;//`PHASE_TWO_ASSERT((f_rx_count < 4)||(f_sub_baud_difference <= ((CLOCKS_PER_BAUD<<F_CKRES)/20)));
 		else
-			assert(f_tx_count < 3 + CLOCKS_PER_BAUD/2);
+			`PHASE_TWO_ASSERT(f_tx_count < (3 + CLOCKS_PER_BAUD/2));
 	end else if (state == 0)
-		assert(f_baud_difference <= 3 + (2 * CLOCKS_PER_BAUD)/20);
+		`PHASE_TWO_ASSERT(f_sub_baud_difference
+				<=  2 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 1)
-		assert(f_baud_difference <= 3 + (3 * CLOCKS_PER_BAUD)/20);
+		`PHASE_TWO_ASSERT(f_sub_baud_difference
+				<=  3 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 2)
-		assert(f_baud_difference <= 3 + (4 * CLOCKS_PER_BAUD)/20);
+		`PHASE_TWO_ASSERT(f_sub_baud_difference
+				<=  4 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 3)
-		assert(f_baud_difference <= 3 + (5 * CLOCKS_PER_BAUD)/20);
+		`PHASE_TWO_ASSERT(f_sub_baud_difference
+				<=  5 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 4)
-		assert(f_baud_difference <= 3 + (6 * CLOCKS_PER_BAUD)/20);
+		`PHASE_TWO_ASSERT(f_sub_baud_difference
+				<=  6 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 5)
-		assert(f_baud_difference <= 3 + (7 * CLOCKS_PER_BAUD)/20);
+		`PHASE_TWO_ASSERT(f_sub_baud_difference
+				<=  7 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 6)
-		assert(f_baud_difference <= 3 + (8 * CLOCKS_PER_BAUD)/20);
+		`PHASE_TWO_ASSERT(f_sub_baud_difference
+				<=  8 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 7)
-		assert(f_baud_difference <= 3 + (9 * CLOCKS_PER_BAUD)/20);
+		`PHASE_TWO_ASSERT(f_sub_baud_difference
+				<=  9 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 8)
-		assert(f_baud_difference <= 3 + (10 * CLOCKS_PER_BAUD)/20);
-
-	initial	assume(i_uart_rx);
-	always @(*)
-	if (f_tx_reg == 10'h0)
-		`PHASE_ONE(i_uart_rx);
-	else
-		`PHASE_ONE(i_uart_rx == f_tx_reg[0]);
+		`PHASE_TWO_ASSERT(f_sub_baud_difference
+				<= 10 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 
 	always @(posedge i_clk)
 	if (o_wr)
-		assert(o_data == $past(f_tx_data,4));
+		`PHASE_TWO_ASSERT(o_data == $past(f_tx_data,4));
 
 	// always @(posedge i_clk)
 	// if ((zero_baud_counter)&&(state != 4'hf)&&(CLOCKS_PER_BAUD > 6))
 		// assert(i_uart_rx == ck_uart);
 
+	// Make sure the data register matches
 	always @(posedge i_clk)
-	if ((f_past_valid)&&(state != $past(state)))
+	// if ((f_past_valid)&&(state != $past(state)))
 	begin
 		if (state == 4'h0)
-			assert(!data_reg[7]);
+			`PHASE_TWO_ASSERT(!data_reg[7]);
 
 		if (state == 4'h1)
-			assert((data_reg[7] == $past(f_tx_data[0]))&&(!data_reg[6]));
+			`PHASE_TWO_ASSERT((data_reg[7]
+				== $past(f_tx_data[0]))&&(!data_reg[6]));
 
 		if (state == 4'h2)
-			assert(data_reg[7:6] == $past(f_tx_data[1:0]));
+			`PHASE_TWO_ASSERT(data_reg[7:6]
+					== $past(f_tx_data[1:0]));
 
 		if (state == 4'h3)
-			assert(data_reg[7:5] == $past(f_tx_data[2:0]));
+			`PHASE_TWO_ASSERT(data_reg[7:5] == $past(f_tx_data[2:0]));
 
 		if (state == 4'h4)
-			assert(data_reg[7:4] == $past(f_tx_data[3:0]));
+			`PHASE_TWO_ASSERT(data_reg[7:4] == $past(f_tx_data[3:0]));
 
 		if (state == 4'h5)
-			assert(data_reg[7:3] == $past(f_tx_data[4:0]));
+			`PHASE_TWO_ASSERT(data_reg[7:3] == $past(f_tx_data[4:0]));
 
 		if (state == 4'h6)
-			assert(data_reg[7:2] == $past(f_tx_data[5:0]));
+			`PHASE_TWO_ASSERT(data_reg[7:2] == $past(f_tx_data[5:0]));
 
 		if (state == 4'h7)
-			assert(data_reg[7:1] == $past(f_tx_data[6:0]));
+			`PHASE_TWO_ASSERT(data_reg[7:1] == $past(f_tx_data[6:0]));
 
 		if (state == 4'h8)
-			assert(data_reg[7:0] == $past(f_tx_data[7:0]));
+			`PHASE_TWO_ASSERT(data_reg[7:0] == $past(f_tx_data[7:0]));
 	end
 
+`endif
 `endif
 `ifdef	FORMAL_VERILATOR
 	// FORMAL properties which can be tested via Verilator as well as
