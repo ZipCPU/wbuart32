@@ -333,30 +333,60 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 `endif	// FORMAL
 `ifdef	VERIFIC_SVA
 	reg	[7:0]	fsv_data;
+
+	//
+	// Grab a copy of the data any time we are sent a new byte to transmit
+	// We'll use this in a moment to compare the item transmitted against
+	// what is supposed to be transmitted
+	//
 	always @(posedge i_clk)
 		if ((i_wr)&&(!o_busy))
 			fsv_data <= i_data;
 
-	sequence	BAUD_INTERVAL(CKS, DAT,ST);
+	//
+	// One baud interval
+	//
+	// 1. The UART output is constant at DAT
+	// 2. The internal state remains constant at ST
+	// 3. CKS = the number of clocks per bit.
+	//
+	// Everything stays constant during the CKS clocks with the exception
+	// of (zero_baud_counter), which is *only* raised on the last clock
+	// interval
+	sequence	BAUD_INTERVAL(CKS, DAT, SR, ST);
 		((o_uart_tx == DAT)&&(state == ST)
+			&&(lcl_data == SR)
 			&&(!zero_baud_counter))[*(CKS-1)]
 		##1 (o_uart_tx == DAT)&&(state == ST)
+			&&(lcl_data == SR)
 			&&(zero_baud_counter);
 	endsequence
 
+	//
+	// One byte transmitted
+	//
+	// DATA = the byte that is sent
+	// CKS  = the number of clocks per bit
+	//
 	sequence	SEND(CKS, DATA);
-		BAUD_INTERVAL(CKS, 1'b0, 4'h0)
-		##1 BAUD_INTERVAL(CKS, DATA[0], 4'h1)
-		##1 BAUD_INTERVAL(CKS, DATA[1], 4'h2)
-		##1 BAUD_INTERVAL(CKS, DATA[2], 4'h3)
-		##1 BAUD_INTERVAL(CKS, DATA[3], 4'h4)
-		##1 BAUD_INTERVAL(CKS, DATA[4], 4'h5)
-		##1 BAUD_INTERVAL(CKS, DATA[5], 4'h6)
-		##1 BAUD_INTERVAL(CKS, DATA[6], 4'h7)
-		##1 BAUD_INTERVAL(CKS, DATA[7], 4'h8)
-		##1 BAUD_INTERVAL(CKS, 1'b1, 4'h9);
+		BAUD_INTERVAL(CKS, 1'b0, DATA, 4'h0)
+		##1 BAUD_INTERVAL(CKS, DATA[0], {{(1){1'b1}},DATA[7:1]}, 4'h1)
+		##1 BAUD_INTERVAL(CKS, DATA[1], {{(2){1'b1}},DATA[7:2]}, 4'h2)
+		##1 BAUD_INTERVAL(CKS, DATA[2], {{(3){1'b1}},DATA[7:3]}, 4'h3)
+		##1 BAUD_INTERVAL(CKS, DATA[3], {{(4){1'b1}},DATA[7:4]}, 4'h4)
+		##1 BAUD_INTERVAL(CKS, DATA[4], {{(5){1'b1}},DATA[7:5]}, 4'h5)
+		##1 BAUD_INTERVAL(CKS, DATA[5], {{(6){1'b1}},DATA[7:6]}, 4'h6)
+		##1 BAUD_INTERVAL(CKS, DATA[6], {{(7){1'b1}},DATA[7:7]}, 4'h7)
+		##1 BAUD_INTERVAL(CKS, DATA[7], 8'hff, 4'h8)
+		##1 BAUD_INTERVAL(CKS, 1'b1, 8'hff, 4'h9);
 	endsequence
 
+	//
+	// Transmit one byte
+	//
+	// Once the byte is transmitted, make certain we return to
+	// idle
+	//
 	assert property (
 		@(posedge i_clk)
 		(i_wr)&&(!o_busy)
@@ -368,14 +398,24 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 		(i_wr)&&(o_busy) |=>
 			(i_wr)&&(o_busy)&&($stable(i_data)));
 
+	//
+	// Make certain that o_busy is true any time zero_baud_counter is
+	// non-zero
+	//
 	always @(*)
 		assert((o_busy)||(zero_baud_counter) );
-	// Check the baud counter
+
+	// If and only if zero_baud_counter is true, baud_counter must be zero
+	// Insist on that relationship here.
 	always @(*)
 		assert(zero_baud_counter == (baud_counter == 0));
 
+	// To make certain baud_counter stays below CLOCKS_PER_BAUD
 	always @(*)
 		assert(baud_counter < CLOCKS_PER_BAUD);
+
+	//
+	// Insist that we are only ever in a valid state
 	always @(*)
 		assert((state <= `TXUL_STOP+1'b1)||(state == `TXUL_IDLE));
 
