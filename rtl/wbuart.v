@@ -179,7 +179,7 @@ module	wbuart(i_clk, i_rst,
 
 	// The clear to send line, which may be ignored, but which we set here
 	// to be true any time the FIFO has fewer than N-2 items in it.
-	// Why N-1?  Because at N-1 we are totally full, but already so full
+	// Why not N-1?  Because at N-1 we are totally full, but already so full
 	// that if the transmit end starts sending we won't have a location to
 	// receive it.  (Transmit might've started on the next character by the
 	// time we set this--thus we need to set it to one, one character before

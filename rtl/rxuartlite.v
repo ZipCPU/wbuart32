@@ -673,6 +673,8 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data
 			`PHASE_TWO_ASSERT(data_reg[7:0] == $past(f_tx_data[7:0]));
 	end
 
+	always @(posedge i_clk)
+		cover(o_wr);
 `endif
 `endif
 `ifdef	FORMAL_VERILATOR

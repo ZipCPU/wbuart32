@@ -72,12 +72,14 @@ $(TX) : $(TX).check
 $(TX).check: $(TX).smt2
 	$(SMTBMC) --presat $(BMCARGS) -t 90 --dump-vcd $(TX).vcd $(TX).smt2
 	$(SMTBMC)          $(INDARGS) -t 90 --dump-vcd $(TX).vcd $(TX).smt2
+	$(SMTBMC) -c $(SOLVER) -t 90 --dump-vcd $(TX).vcd $(TX).smt2
 	touch $@
 
 $(RX) : $(RX).check
 $(RX).check: $(RX).smt2
 	$(SMTBMC) --presat $(BMCARGS) -t 150 --dump-vcd $(RX).vcd $(RX).smt2
 	$(SMTBMC)          $(INDARGS) -t 150 --dump-vcd $(RX).vcd $(RX).smt2
+	$(SMTBMC) -c $(SOLVER) -t 240 --dump-vcd $(TX).vcd $(TX).smt2
 	touch $@
 
 

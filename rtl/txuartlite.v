@@ -330,6 +330,10 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	always @(posedge i_clk)
 		assert((state <= `TXUL_STOP + 1'b1)||(state == `TXUL_IDLE));
 
+	always @(posedge i_clk)
+	if ((f_past_valid)&&($past(f_past_valid))&&($past(o_busy)))
+		cover(!o_busy);
+
 `endif	// FORMAL
 `ifdef	VERIFIC_SVA
 	reg	[7:0]	fsv_data;
