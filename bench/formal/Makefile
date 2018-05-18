@@ -38,7 +38,7 @@
 ################################################################################
 ##
 ##
-TESTS := ufifo
+TESTS := ufifo txuartlite rxuartlite
 .PHONY: $(TESTS)
 all: $(TESTS)
 RTL := ../../rtl

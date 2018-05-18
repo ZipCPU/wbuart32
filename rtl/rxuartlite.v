@@ -199,7 +199,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data
 			zero_baud_counter <= 1'b1;
 		else if ((zero_baud_counter)&&(state != `RXUL_IDLE))
 			zero_baud_counter <= 1'b0;
-		else if (baud_counter == 24'h01)
+		else if (baud_counter == 1)
 			zero_baud_counter <= 1'b1;
 
 `ifdef	FORMAL
