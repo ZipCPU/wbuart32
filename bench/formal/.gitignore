@@ -2,3 +2,5 @@
 *.check
 *.vcd
 *.yslog
+rxuartlite_one
+rxuartlite_two
