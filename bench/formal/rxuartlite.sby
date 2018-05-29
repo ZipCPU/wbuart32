@@ -5,7 +5,8 @@ two
 [options]
 mode prove
 multiclock on
-depth 150
+one: depth   20
+two: depth  120
 
 [engines]
 smtbmc
