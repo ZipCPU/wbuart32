@@ -213,6 +213,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 `define	PHASE_ONE_ASSERT	assume
 `endif
 
+	localparam	F_CKRES = 10;
 
 	wire			f_tx_start, f_tx_busy;
 	wire	[(F_CKRES-1):0]	f_tx_step;
@@ -563,7 +564,6 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 
 	localparam	F_SYNC_DLY = 8;
 
-	localparam	F_CKRES = 10;
 	wire	[(TB+4+F_CKRES-1):0]	f_sub_baud_difference;
 	reg	[F_CKRES-1:0]	ck_tx_clock;
 	reg	[((F_SYNC_DLY-1)*F_CKRES)-1:0]	q_tx_clock;

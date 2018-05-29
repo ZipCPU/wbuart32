@@ -77,7 +77,6 @@ $(TX).check: $(TX).smt2
 
 $(RX) : $(RX).check
 $(RX).check: $(RX).sby $(RTL)/$(RX).v
-	rm $@
 	sby -f $(RX).sby
 	touch $@
 
