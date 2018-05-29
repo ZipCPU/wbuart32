@@ -76,10 +76,9 @@ $(TX).check: $(TX).smt2
 	touch $@
 
 $(RX) : $(RX).check
-$(RX).check: $(RX).smt2
-	$(SMTBMC) --presat $(BMCARGS) -t 150 --dump-vcd $(RX).vcd $(RX).smt2
-	$(SMTBMC)          $(INDARGS) -t 150 --dump-vcd $(RX).vcd $(RX).smt2
-	$(SMTBMC) -c $(SOLVER) -t 240 --dump-vcd $(TX).vcd $(TX).smt2
+$(RX).check: $(RX).sby $(RTL)/$(RX).v
+	rm $@
+	sby -f $(RX).sby
 	touch $@
 
 
@@ -87,4 +86,5 @@ $(RX).check: $(RX).smt2
 clean:
 	rm -f  $(FIFO).smt2 $(FIFO)*.vcd
 	rm -f  $(TX).smt2   $(TX)*.vcd
+	rm -rf $(RX)_one/   $(RX)_two/
 	rm -f *.check

@@ -59,22 +59,14 @@
 `define	RXUL_WAIT		4'h9
 `define	RXUL_IDLE		4'hf
 
-module rxuartlite(i_clk, i_uart_rx, o_wr, o_data
-`ifdef	FORMAL
-		, f_sub_baud_difference
-`endif
-		);
-	parameter	TIMER_BITS = 10;
-	parameter [(TIMER_BITS-1):0] CLOCKS_PER_BAUD = 868;
-	localparam	TB = TIMER_BITS;
+module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
+	parameter			TIMER_BITS = 10;
+	parameter  [(TIMER_BITS-1):0]	CLOCKS_PER_BAUD = 868;	// 115200 MBaud at 100MHz
+	localparam			TB = TIMER_BITS;
 	input	wire		i_clk;
 	input	wire		i_uart_rx;
 	output	reg		o_wr;
 	output	reg	[7:0]	o_data;
-`ifdef	FORMAL
-	localparam	F_CKRES = 10;
-	output	wire	[(TB+4+F_CKRES-1):0]	f_sub_baud_difference;
-`endif
 
 
 	wire	[(TB-1):0]	half_baud;
@@ -129,9 +121,9 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data
 				// UNLESS: We are in the center of a valid
 				// start bit
 				state <= `RXUL_BIT_ZERO;
-		else if ((state == `RXUL_WAIT)&&(ck_uart))
+		end else if ((state >= `RXUL_WAIT)&&(ck_uart))
 			state <= `RXUL_IDLE;
-		end else if (zero_baud_counter)
+		else if (zero_baud_counter)
 		begin
 			if (state <= `RXUL_STOP)
 				// Data arrives least significant bit first.
@@ -180,7 +172,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data
 			baud_counter <= CLOCKS_PER_BAUD-1'b1;
 		else if (state == `RXUL_WAIT)
 			baud_counter <= 0;
-		else if ((zero_baud_counter)&&(state != `RXUL_IDLE))
+		else if ((zero_baud_counter)&&(state < `RXUL_STOP))
 			baud_counter <= CLOCKS_PER_BAUD-1'b1;
 		else if (!zero_baud_counter)
 			baud_counter <= baud_counter-1'b1;
@@ -197,7 +189,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data
 			zero_baud_counter <= 1'b0;
 		else if (state == `RXUL_WAIT)
 			zero_baud_counter <= 1'b1;
-		else if ((zero_baud_counter)&&(state != `RXUL_IDLE))
+		else if ((zero_baud_counter)&&(state < `RXUL_STOP))
 			zero_baud_counter <= 1'b0;
 		else if (baud_counter == 1)
 			zero_baud_counter <= 1'b1;
@@ -212,7 +204,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data
 
 `ifdef	FORMAL
 
-`define PHASE_TWO
+// `define PHASE_TWO	// SymbiYosys controls this definition
 `define	PHASE_ONE_ASSERT	assert
 `define	PHASE_TWO_ASSERT	assert
 
@@ -536,6 +528,14 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data
 		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'hd);
 	end
 
+	always @(posedge i_clk)
+	if ((f_past_valid)&&($past(state) >= `RXUL_WAIT)&&($past(ck_uart)))
+		`PHASE_ONE_ASSERT(state == `RXUL_IDLE);
+
+	always @(posedge i_clk)
+	if ((f_past_valid)&&($past(state) >= `RXUL_WAIT)
+			&&(($past(state) != `RXUL_IDLE)||(state == `RXUL_IDLE)))
+		`PHASE_ONE_ASSERT(zero_baud_counter);
 
 	// Calculate an absolute value of the difference between the two baud
 	// clocks
@@ -563,6 +563,8 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data
 
 	localparam	F_SYNC_DLY = 8;
 
+	localparam	F_CKRES = 10;
+	wire	[(TB+4+F_CKRES-1):0]	f_sub_baud_difference;
 	reg	[F_CKRES-1:0]	ck_tx_clock;
 	reg	[((F_SYNC_DLY-1)*F_CKRES)-1:0]	q_tx_clock;
 	reg	[TB+3:0]	ck_tx_count;
@@ -596,13 +598,17 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data
 		f_sub_baud_difference =  f_signed_difference;
 
 	always @($global_clock)
+	if (state == `RXUL_WAIT)
+		`PHASE_TWO_ASSERT((!f_tx_busy)||(f_tx_reg[9:1] == 0));
+
+	always @($global_clock)
 	if (state == `RXUL_IDLE)
 	begin
-		`PHASE_TWO_ASSERT((!f_tx_busy)||(f_tx_reg[9]));
+		`PHASE_TWO_ASSERT((!f_tx_busy)||(f_tx_reg[9])||(f_tx_reg[9:1]==0));
 		if (!ck_uart)
 			;//`PHASE_TWO_ASSERT((f_rx_count < 4)||(f_sub_baud_difference <= ((CLOCKS_PER_BAUD<<F_CKRES)/20)));
 		else
-			`PHASE_TWO_ASSERT(f_tx_count < (3 + CLOCKS_PER_BAUD/2));
+			`PHASE_TWO_ASSERT((f_tx_reg[9:1]==0)||(f_tx_count < (3 + CLOCKS_PER_BAUD/2)));
 	end else if (state == 0)
 		`PHASE_TWO_ASSERT(f_sub_baud_difference
 				<=  2 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));

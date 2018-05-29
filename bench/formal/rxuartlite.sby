@@ -1,0 +1,21 @@
+[tasks]
+one
+two
+
+[options]
+mode prove
+multiclock on
+depth 150
+
+[engines]
+smtbmc
+
+[script]
+one: read_verilog -D RXUARTLITE -formal rxuartlite.v
+two: read_verilog -D RXUARTLITE -D PHASE_TWO -formal rxuartlite.v
+chparam -set CLOCKS_PER_BAUD 16 rxuartlite
+prep -top rxuartlite
+# opt_merge -share_all
+
+[files]
+../../rtl/rxuartlite.v
