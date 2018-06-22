@@ -221,7 +221,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 				if (state == `TXU_BIT_SEVEN)
 					state <= (use_parity)?`TXU_PARITY:`TXU_STOP;
 				else
-					state <= state + 1;
+					state <= state + 1'b1;
 			end else if (state == `TXU_PARITY)
 			begin
 				state <= `TXU_STOP;
@@ -392,5 +392,191 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 		end else
 			baud_counter <= clocks_per_baud - 28'h01;
 	end
+
+`ifdef	FORMAL
+	reg		fsv_parity;
+	reg	[30:0]	fsv_setup;
+	reg	[7:0]	fsv_data;
+
+	always @(posedge i_clk)
+		if ((i_wr)&&(!o_busy))
+			fsv_data <= i_data;
+
+	always @(posedge i_clk)
+		if ((i_wr)&&(!o_busy))
+			fsv_setup <= i_setup;
+
+	always @(posedge i_clk)
+		assert(zero_baud_counter == (baud_counter == 0));
+
+	always @(*)
+		assume(i_setup[21:0] >= 2);
+	always @(*)
+		assume(i_setup[21:0] <= 16);
+
+	// A single baud interval
+	sequence	BAUD_INTERVAL(DAT, SR, ST);
+		((o_uart_tx == DAT)&&(state == ST)
+			&&(lcl_data == SR)
+			&&(baud_counter == fsv_setup[21:0]-1)
+			&&(!zero_baud_counter))
+		##1 ((o_uart_tx == DAT)&&(state == ST)
+			&&(lcl_data == SR)
+			&&(baud_counter == $past(baud_counter)-1)
+			&&(baud_counter > 0)
+			&&(baud_counter < fsv_setup[21:0])
+			&&(!zero_baud_counter))[*0:$]
+		##1 (o_uart_tx == DAT)&&(state == ST)
+			&&(lcl_data == SR)
+			&&(zero_baud_counter);
+	endsequence
+
+	//
+	// One byte transmitted
+	//
+	// DATA = the byte that is sent
+	// CKS  = the number of clocks per bit
+	//
+	sequence	SEND5(DATA);
+		BAUD_INTERVAL(1'b0, DATA, 4'h3)
+		##1 BAUD_INTERVAL(DATA[0], {{(1){1'b1}},DATA[7:1]}, 4'h4)
+		##1 BAUD_INTERVAL(DATA[1], {{(2){1'b1}},DATA[7:2]}, 4'h5)
+		##1 BAUD_INTERVAL(DATA[2], {{(3){1'b1}},DATA[7:3]}, 4'h6)
+		##1 BAUD_INTERVAL(DATA[3], {{(4){1'b1}},DATA[7:4]}, 4'h7)
+		##1 BAUD_INTERVAL(DATA[4], {{(5){1'b1}},DATA[7:5]}, 4'h8);
+	endsequence
+
+	sequence	SEND6(DATA);
+		BAUD_INTERVAL(1'b0, DATA, 4'h2)
+		##1 BAUD_INTERVAL(DATA[0], {{(1){1'b1}},DATA[7:1]}, 4'h3)
+		##1 BAUD_INTERVAL(DATA[1], {{(2){1'b1}},DATA[7:2]}, 4'h4)
+		##1 BAUD_INTERVAL(DATA[2], {{(3){1'b1}},DATA[7:3]}, 4'h5)
+		##1 BAUD_INTERVAL(DATA[3], {{(4){1'b1}},DATA[7:4]}, 4'h6)
+		##1 BAUD_INTERVAL(DATA[4], {{(5){1'b1}},DATA[7:5]}, 4'h7)
+		##1 BAUD_INTERVAL(DATA[5], {{(6){1'b1}},DATA[7:6]}, 4'h8);
+	endsequence
+
+	sequence	SEND7(DATA);
+		BAUD_INTERVAL(1'b0, DATA, 4'h1)
+		##1 BAUD_INTERVAL(DATA[0], {{(1){1'b1}},DATA[7:1]}, 4'h2)
+		##1 BAUD_INTERVAL(DATA[1], {{(2){1'b1}},DATA[7:2]}, 4'h3)
+		##1 BAUD_INTERVAL(DATA[2], {{(3){1'b1}},DATA[7:3]}, 4'h4)
+		##1 BAUD_INTERVAL(DATA[3], {{(4){1'b1}},DATA[7:4]}, 4'h5)
+		##1 BAUD_INTERVAL(DATA[4], {{(5){1'b1}},DATA[7:5]}, 4'h6)
+		##1 BAUD_INTERVAL(DATA[5], {{(6){1'b1}},DATA[7:6]}, 4'h7)
+		##1 BAUD_INTERVAL(DATA[6], {{(7){1'b1}},DATA[7:7]}, 4'h8);
+	endsequence
+
+	sequence	SEND8(DATA);
+		BAUD_INTERVAL(1'b0, DATA, 4'h0)
+		##1 BAUD_INTERVAL(DATA[0], {{(1){1'b1}},DATA[7:1]}, 4'h1)
+		##1 BAUD_INTERVAL(DATA[1], {{(2){1'b1}},DATA[7:2]}, 4'h2)
+		##1 BAUD_INTERVAL(DATA[2], {{(3){1'b1}},DATA[7:3]}, 4'h3)
+		##1 BAUD_INTERVAL(DATA[3], {{(4){1'b1}},DATA[7:4]}, 4'h4)
+		##1 BAUD_INTERVAL(DATA[4], {{(5){1'b1}},DATA[7:5]}, 4'h5)
+		##1 BAUD_INTERVAL(DATA[5], {{(6){1'b1}},DATA[7:6]}, 4'h6)
+		##1 BAUD_INTERVAL(DATA[6], {{(7){1'b1}},DATA[7:7]}, 4'h7)
+		##1 BAUD_INTERVAL(DATA[7], 8'hff, 4'h8);
+	endsequence
+
+	always @(posedge i_clk)
+	if (fsv_setup[25])
+		fsv_parity <= fsv_setup[24];
+	else
+		case(fsv_setup[29:28])
+		2'b00: fsv_parity <= (^fsv_data[4:0]) ^ fsv_setup[24];
+		2'b01: fsv_parity <= (^fsv_data[5:0]) ^ fsv_setup[24];
+		2'b10: fsv_parity <= (^fsv_data[6:0]) ^ fsv_setup[24];
+		2'b11: fsv_parity <= (^fsv_data[7:0]) ^ fsv_setup[24];
+		endcase
+
+	assert property( @(posedge i_clk)
+		(o_busy)[*2] |=> $stable(fsv_parity));
+
+	assert property( @(posedge i_clk)
+		(o_busy) |=> $stable(fsv_data));
+
+	assert property( @(posedge i_clk)
+		(o_busy) |=> $stable(fsv_setup));
+
+	sequence	SENDPARITY(SETUP);
+			((o_uart_tx == fsv_parity)&&(state == `TXU_PARITY)
+				&&(SETUP[26])
+				&&(baud_counter == SETUP[21:0]-1)
+				&&(!zero_baud_counter))
+			##1 ((o_uart_tx == fsv_parity)&&(state == `TXU_PARITY)
+				&&(SETUP[26])
+				&&(baud_counter < SETUP[21:0])
+				&&(baud_counter > 0)
+				&&(baud_counter == $past(baud_counter)-1)
+				&&(!zero_baud_counter))[*0:$]
+			##1 (o_uart_tx == fsv_parity)&&(state == `TXU_PARITY)
+				&&(SETUP[26])
+				&&(zero_baud_counter);
+	endsequence
+
+	sequence	SENDSINGLESTOP(CKS,ST);
+		((o_uart_tx == 1'b1)&&(state == ST)
+			&&(baud_counter == CKS-1)
+			&&(!zero_baud_counter))
+		##1 ((o_uart_tx == 1'b1)&&(state == ST)
+			&&(baud_counter > 0)
+			&&(baud_counter == $past(baud_counter)-1)
+			&&(!zero_baud_counter))[*0:$]
+		##1 (o_uart_tx == 1'b1)&&(state == ST)
+			&&(zero_baud_counter);
+	endsequence
+
+	sequence	SENDFULLSTOP(SETUP);
+		((!SETUP[27]) throughout SENDSINGLESTOP(SETUP[21:0],`TXU_STOP))
+		or (SETUP[27]) throughout
+			SENDSINGLESTOP(SETUP[21:0],`TXU_STOP)
+			##1 SENDSINGLESTOP(SETUP[21:0],`TXU_SECOND_STOP);
+	endsequence
+
+	sequence	UART_IDLE;
+		(!o_busy)&&(o_uart_tx)&&(zero_baud_counter);
+	endsequence
+
+	assert property ( @(posedge i_clk) (!o_busy) |-> UART_IDLE);
+
+
+	assert property ( @(posedge i_clk)
+		(i_wr)&&(!o_busy)&&(i_setup[29:28]==2'b00) |=>
+			((o_busy) throughout
+				SEND5(fsv_data)
+				##1 SENDPARITY(fsv_setup)
+				##1 SENDFULLSTOP(fsv_setup)
+			)
+		##1 UART_IDLE);
+
+	assert property ( @(posedge i_clk)
+		(i_wr)&&(!o_busy)&&(i_setup[29:28]==2'b01) |=>
+			((o_busy) throughout
+				SEND6(fsv_data)
+				##1 SENDPARITY(fsv_setup)
+				##1 SENDFULLSTOP(fsv_setup)
+			)
+		##1 UART_IDLE);
+
+	assert property ( @(posedge i_clk)
+		(i_wr)&&(!o_busy)&&(i_setup[29:28]==2'b10) |=>
+			((o_busy) throughout
+				SEND7(fsv_data)
+				##1 SENDPARITY(fsv_setup)
+				##1 SENDFULLSTOP(fsv_setup)
+			)
+		##1 UART_IDLE);
+
+	assert property ( @(posedge i_clk)
+		(i_wr)&&(!o_busy)&&(i_setup[29:28]==2'b11) |=>
+			((o_busy) throughout
+				SEND8(fsv_data)
+				##1 SENDPARITY(fsv_setup)
+				##1 SENDFULLSTOP(fsv_setup)
+			)
+		##1 UART_IDLE);
+
+`endif	// FORMAL
 endmodule
 
