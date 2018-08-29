@@ -12,8 +12,10 @@ two: depth  120
 smtbmc
 
 [script]
-one: read_verilog -D RXUARTLITE -formal rxuartlite.v
-two: read_verilog -D RXUARTLITE -D PHASE_TWO -formal rxuartlite.v
+read -define F_OPT_CLK2FFLOGIC
+read -define RXUARTLITE
+one: read -sv              -formal rxuartlite.v
+two: read -sv -D PHASE_TWO -formal rxuartlite.v
 chparam -set CLOCKS_PER_BAUD 16 rxuartlite
 prep -top rxuartlite
 # opt_merge -share_all

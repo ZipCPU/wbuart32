@@ -4,3 +4,6 @@
 *.yslog
 rxuartlite_one
 rxuartlite_two
+txuartlite_verific
+txuartlite_yosys
+ufifo

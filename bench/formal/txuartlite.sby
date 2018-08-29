@@ -24,4 +24,4 @@ prep -top txuartlite
 --
 
 [files]
-txuartlite.v
+../../rtl/txuartlite.v
