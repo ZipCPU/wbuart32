@@ -204,7 +204,8 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 
 `ifdef	FORMAL
 
-// `define PHASE_TWO	// SymbiYosys controls this definition
+`define ASSUME	assume
+
 `define	PHASE_ONE_ASSERT	assert
 `define	PHASE_TWO_ASSERT	assert
 
@@ -239,12 +240,14 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	always @(posedge i_clk)
 		f_past_valid <= 1'b1;
 
+`ifdef	F_OPT_CLK2FFLOGIC
 	initial	f_rx_clock = 3'h0;
 	always @($global_clock)
 		f_rx_clock <= f_rx_clock + 1'b1;
 
 	always @(*)
 		assume(i_clk == f_rx_clock[1]);
+`endif
 
 
 
@@ -271,6 +274,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	initial assert(F_MINSTEP <= F_MIDSTEP);
 	initial assert(F_MIDSTEP <= F_MAXSTEP);
 
+`ifdef	F_OPT_CLK2FFLOGIC
 	assign	f_tx_step = $anyconst;
 	//	assume((f_tx_step >= F_MINSTEP)&&(f_tx_step <= F_MAXSTEP));
 	//
@@ -284,7 +288,9 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 		f_tx_clock <= f_tx_clock + f_tx_step;
 
 	assign	f_txclk = f_tx_clock[F_CKRES-1];
-
+`else
+	assign	f_tx_clk = i_clk;
+`endif
 	// 
 	initial	f_past_valid_tx = 1'b0;
 	always @(posedge f_txclk)
