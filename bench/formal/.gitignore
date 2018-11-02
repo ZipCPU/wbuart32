@@ -7,3 +7,5 @@ rxuartlite_two
 txuartlite_verific
 txuartlite_yosys
 ufifo
+ctrtest
+txuart

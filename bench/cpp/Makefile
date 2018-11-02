@@ -176,4 +176,6 @@ clean:
 	rm -f ./mkspeech ./speech.hex
 	rm -rf $(OBJDIR)/
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(OBJDIR)/depends.txt
+endif

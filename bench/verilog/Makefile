@@ -68,52 +68,45 @@
 ################################################################################
 ##
 ##
-all:	test
+.PHONY: all
+all:	test tags
 YYMMDD=`date +%Y%m%d`
 CXX   := g++
 FBDIR := .
 VDIRFB:= $(FBDIR)/obj_dir
 RTLDR := ../../rtl
 VERILATOR := verilator
-VFLAGS := -Wall --MMD --trace -y ../../rtl -cc
+VFLAGS := -Wall --MMD --trace -y $(RTLDR) -cc
 
 .PHONY: test testline testhello speechfifo
 test: testline testhello speechfifo
-testline:  $(VDIRFB)/Vlinetest__ALL.a
-testhello: $(VDIRFB)/Vhelloworld__ALL.a
+testline:   $(VDIRFB)/Vlinetest__ALL.a
+testhello:  $(VDIRFB)/Vhelloworld__ALL.a
 speechfifo: $(VDIRFB)/Vspeechfifo__ALL.a
 
-$(VDIRFB)/Vlinetest__ALL.a: $(VDIRFB)/Vlinetest.h $(VDIRFB)/Vlinetest.cpp
-$(VDIRFB)/Vlinetest__ALL.a: $(VDIRFB)/Vlinetest.mk
-$(VDIRFB)/Vlinetest.h $(VDIRFB)/Vlinetest.cpp $(VDIRFB)/Vlinetest.mk: linetest.v
-$(VDIRFB)/Vlinetest.h $(VDIRFB)/Vlinetest.cpp $(VDIRFB)/Vlinetest.mk: $(RTLDR)/rxuart.v $(RTLDR)/txuart.v
-$(VDIRFB)/Vlinetest.h $(VDIRFB)/Vlinetest.cpp $(VDIRFB)/Vlinetest.mk: $(RTLDR)/rxuartlite.v $(RTLDR)/txuartlite.v
+$(VDIRFB)/Vlinetest__ALL.a:   $(VDIRFB)/Vlinetest.cpp
+$(VDIRFB)/Vhelloworld__ALL.a: $(VDIRFB)/Vhelloworld.cpp
+$(VDIRFB)/Vspeechfifo__ALL.a: $(VDIRFB)/Vspeechfifo.cpp
 
-$(VDIRFB)/Vhelloworld__ALL.a: $(VDIRFB)/Vhelloworld.h $(VDIRFB)/Vhelloworld.cpp
-$(VDIRFB)/Vhelloworld__ALL.a: $(VDIRFB)/Vhelloworld.mk
-$(VDIRFB)/Vhelloworld.h $(VDIRFB)/Vhelloworld.cpp $(VDIRFB)/Vhelloworld.mk: helloworld.v
-$(VDIRFB)/Vhelloworld.h $(VDIRFB)/Vhelloworld.cpp $(VDIRFB)/Vhelloworld.mk: $(RTLDR)/txuartlite.v $(RTLDR)/txuart.v
-
-SPEECHSRCS := $(addprefix $(RTLDR)/,rxuart.v txuart.v rxuartlite.v txuartlite.v ufifo.v wbuart.v)
-SPEECHVFILES:= $(addprefix $(VDIRFB)/,Vspeechfifo.h Vspeechfifo.cpp Vspeechfifo.mk)
-$(VDIRFB)/Vspeechfifo__ALL.a: $(VDIRFB)/Vspeechfifo.h $(VDIRFB)/Vspeechfifo.cpp
-$(VDIRFB)/Vspeechfifo__ALL.a: $(VDIRFB)/Vspeechfifo.mk
-$(SPEECHVFILES): speechfifo.v $(SPEECHSRCS)
-
-$(VDIRFB)/V%.cpp $(VDIRFB)/V%.h $(VDIRFB)/V%.mk: $(FBDIR)/%.v
+$(VDIRFB)/V%.mk:  $(VDIRFB)/%.h
+$(VDIRFB)/V%.h:   $(VDIRFB)/%.cpp
+$(VDIRFB)/V%.cpp: $(FBDIR)/%.v
 	$(VERILATOR) $(VFLAGS) $*.v
 
-$(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.mk
+$(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.cpp
 	cd $(VDIRFB); make -f V$*.mk
+
+tags: $(wildcard *.v) $(wildcard $(RTLDR)/*.v)
+	ctags *.v $(RTLDR)/*.v
 
 .PHONY: clean
 clean:
-	rm -rf $(VDIRFB)/*.mk
-	rm -rf $(VDIRFB)/*.cpp
-	rm -rf $(VDIRFB)/*.h
-	rm -rf $(VDIRFB)/
+	rm -rf tags $(VDIRFB)/
 
-DIRS := $(wildcard $(VDIRFB)/*.d)
-ifneq ($(DIRS),)
--include $(DIRS)
+DEPS := $(wildcard $(VDIRFB)/*.d)
+
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(DEPS),)
+include $(DEPS)
+endif
 endif

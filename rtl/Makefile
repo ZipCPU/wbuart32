@@ -39,7 +39,7 @@
 ################################################################################
 ##
 ##
-all:	test
+all:	test tags
 YYMMDD=`date +%Y%m%d`
 CXX   := g++
 FBDIR := .
@@ -53,36 +53,31 @@ test: $(VDIRFB)/Vwbuart__ALL.a
 test: $(VDIRFB)/Vtxuartlite__ALL.a
 test: $(VDIRFB)/Vrxuartlite__ALL.a
 
-$(VDIRFB)/Vrxuart__ALL.a: $(VDIRFB)/Vrxuart.h $(VDIRFB)/Vrxuart.cpp
-$(VDIRFB)/Vrxuart__ALL.a: $(VDIRFB)/Vrxuart.mk
-$(VDIRFB)/Vrxuart.h $(VDIRFB)/Vrxuart.cpp $(VDIRFB)/Vrxuart.mk: rxuart.v
+$(VDIRFB)/Vrxuart__ALL.a:     $(VDIRFB)/Vrxuart.cpp
+$(VDIRFB)/Vtxuart__ALL.a:     $(VDIRFB)/Vtxuart.cpp
+$(VDIRFB)/Vrxuartlite__ALL.a: $(VDIRFB)/Vrxuartlite.cpp
+$(VDIRFB)/Vtxuartlite__ALL.a: $(VDIRFB)/Vtxuartlite.cpp
+$(VDIRFB)/Vwbuart__ALL.a:     $(VDIRFB)/Vwbuart.cpp
 
-$(VDIRFB)/Vrxuartlite__ALL.a: $(VDIRFB)/Vrxuartlite.h $(VDIRFB)/Vrxuartlite.cpp
-$(VDIRFB)/Vrxuartlite__ALL.a: $(VDIRFB)/Vrxuartlite.mk
-$(VDIRFB)/Vrxuartlite.h $(VDIRFB)/Vrxuartlite.cpp $(VDIRFB)/Vrxuartlite.mk: rxuartlite.v
-
-$(VDIRFB)/Vtxuart__ALL.a: $(VDIRFB)/Vtxuart.h $(VDIRFB)/Vtxuart.cpp
-$(VDIRFB)/Vtxuart__ALL.a: $(VDIRFB)/Vtxuart.mk
-$(VDIRFB)/Vtxuart.h $(VDIRFB)/Vtxuart.cpp $(VDIRFB)/Vtxuart.mk: txuart.v
-
-$(VDIRFB)/Vtxuartlite__ALL.a: $(VDIRFB)/Vtxuartlite.h $(VDIRFB)/Vtxuartlite.cpp
-$(VDIRFB)/Vtxuartlite__ALL.a: $(VDIRFB)/Vtxuartlite.mk
-$(VDIRFB)/Vtxuartlite.h $(VDIRFB)/Vtxuartlite.cpp $(VDIRFB)/Vtxuartlite.mk: txuartlite.v
-
-$(VDIRFB)/Vwbuart__ALL.a: $(VDIRFB)/Vwbuart.h $(VDIRFB)/Vwbuart.cpp
-$(VDIRFB)/Vwbuart__ALL.a: $(VDIRFB)/Vwbuart.mk
-$(VDIRFB)/Vwbuart.h $(VDIRFB)/Vwbuart.cpp $(VDIRFB)/Vwbuart.mk: wbuart.v ufifo.v txuart.v rxuart.v
-
-$(VDIRFB)/V%.cpp $(VDIRFB)/V%.h $(VDIRFB)/V%.mk: $(FBDIR)/%.v
-	$(VERILATOR) -Wall -cc $*.v
+$(VDIRFB)/V%.mk:  $(VDIRFB)/%.h
+$(VDIRFB)/V%.h:   $(VDIRFB)/%.cpp
+$(VDIRFB)/V%.cpp: $(FBDIR)/%.v
+	$(VERILATOR) --trace -MMD -Wall -cc $*.v
 
 $(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.mk
 	cd $(VDIRFB); make -f V$*.mk
 
+tags: $(wildcard *.v)
+	ctags *.v
+
 .PHONY: clean
 clean:
-	rm -rf $(VDIRFB)/*.mk
-	rm -rf $(VDIRFB)/*.cpp
-	rm -rf $(VDIRFB)/*.h
-	rm -rf $(VDIRFB)/
+	rm -rf tags $(VDIRFB)/
 
+DEPS := $(wildcard $(VDIRFB)/*.d)
+
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(DEPS),)
+include $(DEPS)
+endif
+endif
