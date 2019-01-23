@@ -1,27 +1,18 @@
 [tasks]
-verific
-yosys
+cvr
+prf
 
 [options]
-mode prove
+prf: mode prove
+cvr: mode cover
 depth 90
-expect pass
 
 [engines]
-smtbmc yices
+smtbmc boolector
 
 [script]
-verific:
-verific -vlog-define VERIFIC_SVA
-verific -sv txuartlite.v
-verific -import -extnets -all txuartlite
+read -formal -DTXUARTLITE txuartlite.v
 prep -top txuartlite
---
-
-yosys:
-read_verilog -DTXUARTLITE -formal txuartlite.v
-prep -top txuartlite
---
 
 [files]
 ../../rtl/txuartlite.v

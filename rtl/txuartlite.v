@@ -67,7 +67,6 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	parameter	[4:0]	TIMING_BITS = 5'd24;
 	localparam		TB = TIMING_BITS;
 	parameter	[(TB-1):0]	CLOCKS_PER_BAUD = 8; // 24'd868;
-	parameter	[0:0]	F_OPT_CLK2FFLOGIC = 1'b0;
 	input	wire		i_clk;
 	input	wire		i_wr;
 	input	wire	[7:0]	i_data;
@@ -229,22 +228,6 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	// Setup
 
 	reg	f_past_valid, f_last_clk;
-
-	generate if (F_OPT_CLK2FFLOGIC)
-	begin
-
-		always @($global_clock)
-		begin
-			restrict(i_clk == !f_last_clk);
-			f_last_clk <= i_clk;
-			if (!$rose(i_clk))
-			begin
-				`ASSUME($stable(i_wr));
-				`ASSUME($stable(i_data));
-			end
-		end
-
-	end endgenerate
 
 	initial	f_past_valid = 1'b0;
 	always @(posedge i_clk)

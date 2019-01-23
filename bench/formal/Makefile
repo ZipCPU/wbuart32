@@ -38,52 +38,38 @@
 ################################################################################
 ##
 ##
-TESTS := ufifo txuartlite rxuartlite
+TESTS := ufifo txuartlite rxuartlite txuart
 .PHONY: $(TESTS)
 all: $(TESTS)
 RTL := ../../rtl
-SMTBMC  := yosys-smtbmc
-# SOLVER  := -s z3
-SOLVER  := -s yices
-# BMCARGS := --presat $(SOLVER)
-BMCARGS := $(SOLVER)
-INDARGS := $(SOLVER) -i
 
 FIFO  := ufifo
-TX    := txuartlite
+TX    := txuart
+TXLITE:= txuartlite
 RX    := rxuartlite
 
-$(FIFO).smt2: $(RTL)/$(FIFO).v $(FIFO).ys
-	yosys -ql $(FIFO).yslog -s $(FIFO).ys
+.PHONY: $(FIFO) $(TX) $(RX) $(TXLITE)
+$(FIFO): $(FIFO)/PASS
+$(TX): $(TX)/PASS
+$(RX): $(RX)_prf/PASS $(RX)_cvr/PASS
+$(TXLITE): $(TXLITE)_cvr/PASS $(TXLITE)_prf/PASS
 
-$(TX).smt2: $(RTL)/$(TX).v $(TX).ys
-	yosys -ql $(TX).yslog -s $(TX).ys
+$(TX)/PASS:     $(TX).sby $(RTL)/$(TX).v
+	sby -f $(TX).sby
 
-$(RX).smt2: $(RTL)/$(RX).v $(RX).ys
-	yosys -ql $(RX).yslog -s $(RX).ys
+$(RX)_prf/PASS:     $(RX).sby $(RTL)/$(RX).v
+	sby -f $(RX).sby prf
+$(RX)_cvr/PASS:     $(RX).sby $(RTL)/$(RX).v
+	sby -f $(RX).sby cvr
 
-$(FIFO) : $(FIFO).check
-$(FIFO).check: $(FIFO).smt2
-	$(SMTBMC) --presat $(BMCARGS) -t 10 --dump-vcd $(FIFO).vcd $(FIFO).smt2
-	$(SMTBMC)          $(INDARGS) -t 10 --dump-vcd $(FIFO).vcd $(FIFO).smt2
-	touch $@
+$(TXLITE)_cvr/PASS:     $(TXLITE).sby $(RTL)/$(TXLITE).v
+	sby -f $(TXLITE).sby cvr
+$(TXLITE)_prf/PASS:     $(TXLITE).sby $(RTL)/$(TXLITE).v
+	sby -f $(TXLITE).sby prf
 
-$(TX) : $(TX).check
-$(TX).check: $(TX).smt2
-	$(SMTBMC) --presat $(BMCARGS) -t 90 --dump-vcd $(TX).vcd $(TX).smt2
-	$(SMTBMC)          $(INDARGS) -t 90 --dump-vcd $(TX).vcd $(TX).smt2
-	$(SMTBMC) -c $(SOLVER) -t 90 --dump-vcd $(TX).vcd $(TX).smt2
-	touch $@
-
-$(RX) : $(RX).check
-$(RX).check: $(RX).sby $(RTL)/$(RX).v
-	sby -f $(RX).sby
-	touch $@
-
+$(FIFO)/PASS:   $(FIFO).sby $(RTL)/$(FIFO).v
+	sby -f $(FIFO).sby
 
 .PHONY: clean
 clean:
-	rm -f  $(FIFO).smt2 $(FIFO)*.vcd
-	rm -f  $(TX).smt2   $(TX)*.vcd
-	rm -rf $(RX)_one/   $(RX)_two/
-	rm -f *.check
+	rm -rf $(FIFO)/ $(RX)_*/ $(TX)/ $(TXLITE)_cvr/ $(TXLITE)_prf/

@@ -48,7 +48,6 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 	parameter	BW=8;	// Byte/data width
 	parameter [3:0]	LGFLEN=4;
 	parameter 	RXFIFO=1'b0;
-	parameter	[0:0]	F_OPT_CLK2FFLOGIC = 1'b0;
 	input	wire		i_clk, i_rst;
 	input	wire		i_wr;
 	input	wire [(BW-1):0]	i_data;
@@ -294,24 +293,6 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 //
 //
 	reg	f_past_valid, f_last_clk;
-
-	initial restrict(i_rst);
-
-	generate if (F_OPT_CLK2FFLOGIC)
-	begin
-		always @($global_clock)
-		begin
-			restrict(i_clk == !f_last_clk);
-			f_last_clk <= i_clk;
-			if (!$rose(i_clk))
-			begin
-				`ASSUME($stable(i_rst));
-				`ASSUME($stable(i_wr));
-				`ASSUME($stable(i_data));
-				`ASSUME($stable(i_rd));
-			end
-		end
-	end endgenerate
 
 	//
 	// Underflows are a very real possibility, should the user wish to

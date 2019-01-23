@@ -1,0 +1,13 @@
+[options]
+mode prove
+depth 10
+
+[engines]
+smtbmc boolector
+
+[script]
+read -formal -DTXUART txuart.v
+prep -top txuart
+
+[files]
+../../rtl/txuart.v

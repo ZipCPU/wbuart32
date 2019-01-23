@@ -61,7 +61,11 @@
 
 module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	parameter			TIMER_BITS = 10;
+`ifdef	FORMAL
+	parameter  [(TIMER_BITS-1):0]	CLOCKS_PER_BAUD = 16; // Necessary for formal proof
+`else
 	parameter  [(TIMER_BITS-1):0]	CLOCKS_PER_BAUD = 868;	// 115200 MBaud at 100MHz
+`endif
 	localparam			TB = TIMER_BITS;
 	input	wire		i_clk;
 	input	wire		i_uart_rx;
@@ -95,10 +99,10 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	reg	[(TB-1):0]	chg_counter;
 	initial	chg_counter = {(TB){1'b1}};
 	always @(posedge i_clk)
-		if (qq_uart != ck_uart)
-			chg_counter <= 0;
-		else if (chg_counter != { (TB){1'b1} })
-			chg_counter <= chg_counter + 1;
+	if (qq_uart != ck_uart)
+		chg_counter <= 0;
+	else if (chg_counter != { (TB){1'b1} })
+		chg_counter <= chg_counter + 1;
 
 	// Are we in the middle of a baud iterval?  Specifically, are we
 	// in the middle of a start bit?  Set this to high if so.  We'll use
@@ -112,25 +116,23 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 
 	initial	state = `RXUL_IDLE;
 	always @(posedge i_clk)
+	if (state == `RXUL_IDLE)
+	begin // Idle state, independent of baud counter
+		// By default, just stay in the IDLE state
+		state <= `RXUL_IDLE;
+		if ((!ck_uart)&&(half_baud_time))
+			// UNLESS: We are in the center of a valid
+			// start bit
+			state <= `RXUL_BIT_ZERO;
+	end else if ((state >= `RXUL_WAIT)&&(ck_uart))
+		state <= `RXUL_IDLE;
+	else if (zero_baud_counter)
 	begin
-		if (state == `RXUL_IDLE)
-		begin // Idle state, independent of baud counter
-			// By default, just stay in the IDLE state
-			state <= `RXUL_IDLE;
-			if ((!ck_uart)&&(half_baud_time))
-				// UNLESS: We are in the center of a valid
-				// start bit
-				state <= `RXUL_BIT_ZERO;
-		end else if ((state >= `RXUL_WAIT)&&(ck_uart))
-			state <= `RXUL_IDLE;
-		else if (zero_baud_counter)
-		begin
-			if (state <= `RXUL_STOP)
-				// Data arrives least significant bit first.
-				// By the time this is clocked in, it's what
-				// you'll have.
-				state <= state + 1;
-		end
+		if (state <= `RXUL_STOP)
+			// Data arrives least significant bit first.
+			// By the time this is clocked in, it's what
+			// you'll have.
+			state <= state + 1;
 	end
 
 	// Data bit capture logic.
@@ -141,8 +143,8 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	// data in all other cases.  Hence, let's keep it real simple.
 	reg	[7:0]	data_reg;
 	always @(posedge i_clk)
-		if ((zero_baud_counter)&&(state != `RXUL_STOP))
-			data_reg <= { qq_uart, data_reg[7:1] };
+	if ((zero_baud_counter)&&(state != `RXUL_STOP))
+		data_reg <= { qq_uart, data_reg[7:1] };
 
 	// Our data bit logic doesn't need nearly the complexity of all that
 	// work above.  Indeed, we only need to know if we are at the end of
@@ -153,12 +155,12 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	initial	o_wr = 1'b0;
 	initial	o_data = 8'h00;
 	always @(posedge i_clk)
-		if ((zero_baud_counter)&&(state == `RXUL_STOP)&&(ck_uart))
-		begin
-			o_wr   <= 1'b1;
-			o_data <= data_reg;
-		end else
-			o_wr   <= 1'b0;
+	if ((zero_baud_counter)&&(state == `RXUL_STOP)&&(ck_uart))
+	begin
+		o_wr   <= 1'b1;
+		o_data <= data_reg;
+	end else
+		o_wr   <= 1'b0;
 
 	// The baud counter
 	//
@@ -168,14 +170,14 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	// intervals.
 	initial	baud_counter = 0;
 	always @(posedge i_clk)
-		if (((state==`RXUL_IDLE))&&(!ck_uart)&&(half_baud_time))
-			baud_counter <= CLOCKS_PER_BAUD-1'b1;
-		else if (state == `RXUL_WAIT)
-			baud_counter <= 0;
-		else if ((zero_baud_counter)&&(state < `RXUL_STOP))
-			baud_counter <= CLOCKS_PER_BAUD-1'b1;
-		else if (!zero_baud_counter)
-			baud_counter <= baud_counter-1'b1;
+	if (((state==`RXUL_IDLE))&&(!ck_uart)&&(half_baud_time))
+		baud_counter <= CLOCKS_PER_BAUD-1'b1;
+	else if (state == `RXUL_WAIT)
+		baud_counter <= 0;
+	else if ((zero_baud_counter)&&(state < `RXUL_STOP))
+		baud_counter <= CLOCKS_PER_BAUD-1'b1;
+	else if (!zero_baud_counter)
+		baud_counter <= baud_counter-1'b1;
 
 	// zero_baud_counter
 	//
@@ -185,14 +187,14 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	// before--cleaning up some otherwise difficult timing dependencies.
 	initial	zero_baud_counter = 1'b1;
 	always @(posedge i_clk)
-		if ((state == `RXUL_IDLE)&&(!ck_uart)&&(half_baud_time))
-			zero_baud_counter <= 1'b0;
-		else if (state == `RXUL_WAIT)
-			zero_baud_counter <= 1'b1;
-		else if ((zero_baud_counter)&&(state < `RXUL_STOP))
-			zero_baud_counter <= 1'b0;
-		else if (baud_counter == 1)
-			zero_baud_counter <= 1'b1;
+	if ((state == `RXUL_IDLE)&&(!ck_uart)&&(half_baud_time))
+		zero_baud_counter <= 1'b0;
+	else if (state == `RXUL_WAIT)
+		zero_baud_counter <= 1'b1;
+	else if ((zero_baud_counter)&&(state < `RXUL_STOP))
+		zero_baud_counter <= 1'b0;
+	else if (baud_counter == 1)
+		zero_baud_counter <= 1'b1;
 
 `ifdef	FORMAL
 `define	FORMAL_VERILATOR
@@ -203,21 +205,18 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 `endif
 
 `ifdef	FORMAL
-
 `define ASSUME	assume
-
-`define	PHASE_ONE_ASSERT	assert
-`define	PHASE_TWO_ASSERT	assert
-
-`ifdef	PHASE_TWO
-`undef	PHASE_ONE_ASSERT
-`define	PHASE_ONE_ASSERT	assume
+`define ASSERT	assert
+`ifdef	VERIFIC
+	(* gclk *) wire	gbl_clk;
+	global clocking @(posedge gbl_clk); endclocking
 `endif
+
 
 	localparam	F_CKRES = 10;
 
-	wire			f_tx_start, f_tx_busy;
-	wire	[(F_CKRES-1):0]	f_tx_step;
+	(* anyseq *) wire	f_tx_start;
+	(* anyconst *) wire	[(F_CKRES-1):0]	f_tx_step;
 	reg			f_tx_zclk;
 	reg	[(TB-1):0]	f_tx_timer;
 	wire	[7:0]		f_rx_newdata;
@@ -227,7 +226,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	wire	[(TB-1):0]	f_max_baud_difference;
 	reg	[(TB-1):0]	f_baud_difference;
 	reg	[(TB+3):0]	f_tx_count, f_rx_count;
-	wire	[7:0]		f_tx_data;
+	(* anyseq *) wire	[7:0]		f_tx_data;
 
 
 
@@ -240,14 +239,12 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	always @(posedge i_clk)
 		f_past_valid <= 1'b1;
 
-`ifdef	F_OPT_CLK2FFLOGIC
 	initial	f_rx_clock = 3'h0;
 	always @($global_clock)
 		f_rx_clock <= f_rx_clock + 1'b1;
 
 	always @(*)
 		assume(i_clk == f_rx_clock[1]);
-`endif
 
 
 
@@ -274,8 +271,6 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	initial assert(F_MINSTEP <= F_MIDSTEP);
 	initial assert(F_MIDSTEP <= F_MAXSTEP);
 
-`ifdef	F_OPT_CLK2FFLOGIC
-	assign	f_tx_step = $anyconst;
 	//	assume((f_tx_step >= F_MINSTEP)&&(f_tx_step <= F_MAXSTEP));
 	//
 	//
@@ -283,14 +278,10 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 			||(f_tx_step == F_MIDSTEP)
 			||(f_tx_step == F_MAXSTEP));
 
-	// initial	rx_clock = $anyseq;
 	always @($global_clock)
 		f_tx_clock <= f_tx_clock + f_tx_step;
 
 	assign	f_txclk = f_tx_clock[F_CKRES-1];
-`else
-	assign	f_tx_clk = i_clk;
-`endif
 	// 
 	initial	f_past_valid_tx = 1'b0;
 	always @(posedge f_txclk)
@@ -313,7 +304,6 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	// parameter [(TIMER_BITS-1):0] CLOCKS_PER_BAUD = 868;
 	// localparam	TB = TIMER_BITS;
 
-	assign	f_tx_start = $anyseq;
 	always @(*)
 	if (f_tx_busy)
 		assume(!f_tx_start);
@@ -326,16 +316,13 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 		f_tx_baud <= f_tx_baud - 1'b1;
 
 	always @(*)
-		`PHASE_ONE_ASSERT(f_tx_baud < CLOCKS_PER_BAUD);
+		`ASSERT(f_tx_baud < CLOCKS_PER_BAUD);
 
 	always @(*)
 	if (!f_tx_busy)
-		`PHASE_ONE_ASSERT(f_tx_baud == 0);
+		`ASSERT(f_tx_baud == 0);
 
 	assign	f_tx_zbaud = (f_tx_baud == 0);
-
-	// Pick some data to transmit
-	assign	f_tx_data = $anyseq;
 
 	// But only if we aren't busy
 	initial	assume(f_tx_data == 0);
@@ -371,7 +358,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	always @(posedge f_txclk)
 	if (!f_tx_zbaud)
 	begin
-		`PHASE_ONE_ASSERT(f_tx_busy);
+		`ASSERT(f_tx_busy);
 	end else begin
 		f_tx_reg  <= { 1'b0, f_tx_reg[9:1] };
 		if (f_tx_start)
@@ -391,23 +378,23 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	// Tie the TX register to the TX data
 	always @(posedge f_txclk)
 	if (f_tx_reg[9])
-		`PHASE_ONE_ASSERT(f_tx_reg[8:0] == { f_tx_data, 1'b0 });
+		`ASSERT(f_tx_reg[8:0] == { f_tx_data, 1'b0 });
 	else if (f_tx_reg[8])
-		`PHASE_ONE_ASSERT(f_tx_reg[7:0] == f_tx_data[7:0] );
+		`ASSERT(f_tx_reg[7:0] == f_tx_data[7:0] );
 	else if (f_tx_reg[7])
-		`PHASE_ONE_ASSERT(f_tx_reg[6:0] == f_tx_data[7:1] );
+		`ASSERT(f_tx_reg[6:0] == f_tx_data[7:1] );
 	else if (f_tx_reg[6])
-		`PHASE_ONE_ASSERT(f_tx_reg[5:0] == f_tx_data[7:2] );
+		`ASSERT(f_tx_reg[5:0] == f_tx_data[7:2] );
 	else if (f_tx_reg[5])
-		`PHASE_ONE_ASSERT(f_tx_reg[4:0] == f_tx_data[7:3] );
+		`ASSERT(f_tx_reg[4:0] == f_tx_data[7:3] );
 	else if (f_tx_reg[4])
-		`PHASE_ONE_ASSERT(f_tx_reg[3:0] == f_tx_data[7:4] );
+		`ASSERT(f_tx_reg[3:0] == f_tx_data[7:4] );
 	else if (f_tx_reg[3])
-		`PHASE_ONE_ASSERT(f_tx_reg[2:0] == f_tx_data[7:5] );
+		`ASSERT(f_tx_reg[2:0] == f_tx_data[7:5] );
 	else if (f_tx_reg[2])
-		`PHASE_ONE_ASSERT(f_tx_reg[1:0] == f_tx_data[7:6] );
+		`ASSERT(f_tx_reg[1:0] == f_tx_data[7:6] );
 	else if (f_tx_reg[1])
-		`PHASE_ONE_ASSERT(f_tx_reg[0] == f_tx_data[7]);
+		`ASSERT(f_tx_reg[0] == f_tx_data[7]);
 
 	// Our counter since we start
 	initial	f_tx_count = 0;
@@ -430,39 +417,39 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	if (!f_tx_busy)
 	begin
 		if ((!f_past_valid_tx)||(!$past(f_tx_busy)))
-			`PHASE_ONE_ASSERT(f_tx_count == 0);
+			`ASSERT(f_tx_count == 0);
 	end else if (f_tx_reg[9])
-		`PHASE_ONE_ASSERT(f_tx_count ==
+		`ASSERT(f_tx_count ==
 				    CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[8])
-		`PHASE_ONE_ASSERT(f_tx_count ==
+		`ASSERT(f_tx_count ==
 				2 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[7])
-		`PHASE_ONE_ASSERT(f_tx_count ==
+		`ASSERT(f_tx_count ==
 				3 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[6])
-		`PHASE_ONE_ASSERT(f_tx_count ==
+		`ASSERT(f_tx_count ==
 				4 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[5])
-		`PHASE_ONE_ASSERT(f_tx_count ==
+		`ASSERT(f_tx_count ==
 				5 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[4])
-		`PHASE_ONE_ASSERT(f_tx_count ==
+		`ASSERT(f_tx_count ==
 				6 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[3])
-		`PHASE_ONE_ASSERT(f_tx_count ==
+		`ASSERT(f_tx_count ==
 				7 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[2])
-		`PHASE_ONE_ASSERT(f_tx_count ==
+		`ASSERT(f_tx_count ==
 				8 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[1])
-		`PHASE_ONE_ASSERT(f_tx_count ==
+		`ASSERT(f_tx_count ==
 				9 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else if (f_tx_reg[0])
-		`PHASE_ONE_ASSERT(f_tx_count ==
+		`ASSERT(f_tx_count ==
 				10 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 	else
-		`PHASE_ONE_ASSERT(f_tx_count ==
+		`ASSERT(f_tx_count ==
 				11 * CLOCKS_PER_BAUD -1 -f_tx_baud);
 
 
@@ -482,37 +469,37 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 		f_rx_count <= f_rx_count + 1'b1;
 	always @(posedge i_clk)
 	if (state == 0)
-		`PHASE_ONE_ASSERT(f_rx_count
+		`ASSERT(f_rx_count
 				== half_baud + (CLOCKS_PER_BAUD-baud_counter));
 	else if (state == 1)
-		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 2 * CLOCKS_PER_BAUD
+		`ASSERT(f_rx_count == half_baud + 2 * CLOCKS_PER_BAUD
 					- baud_counter);
 	else if (state == 2)
-		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 3 * CLOCKS_PER_BAUD
+		`ASSERT(f_rx_count == half_baud + 3 * CLOCKS_PER_BAUD
 					- baud_counter);
 	else if (state == 3)
-		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 4 * CLOCKS_PER_BAUD
+		`ASSERT(f_rx_count == half_baud + 4 * CLOCKS_PER_BAUD
 					- baud_counter);
 	else if (state == 4)
-		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 5 * CLOCKS_PER_BAUD
+		`ASSERT(f_rx_count == half_baud + 5 * CLOCKS_PER_BAUD
 					- baud_counter);
 	else if (state == 5)
-		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 6 * CLOCKS_PER_BAUD
+		`ASSERT(f_rx_count == half_baud + 6 * CLOCKS_PER_BAUD
 					- baud_counter);
 	else if (state == 6)
-		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 7 * CLOCKS_PER_BAUD
+		`ASSERT(f_rx_count == half_baud + 7 * CLOCKS_PER_BAUD
 					- baud_counter);
 	else if (state == 7)
-		`PHASE_ONE_ASSERT(f_rx_count == half_baud + 8 * CLOCKS_PER_BAUD
+		`ASSERT(f_rx_count == half_baud + 8 * CLOCKS_PER_BAUD
 					- baud_counter);
 	else if (state == 8)
-		`PHASE_ONE_ASSERT((f_rx_count == half_baud + 9 * CLOCKS_PER_BAUD
+		`ASSERT((f_rx_count == half_baud + 9 * CLOCKS_PER_BAUD
 					- baud_counter)
 			||(f_rx_count == half_baud + 10 * CLOCKS_PER_BAUD
 					- baud_counter));
 
 	always @(*)
-		`PHASE_ONE_ASSERT( ((!zero_baud_counter)
+		`ASSERT( ((!zero_baud_counter)
 				&&(state == `RXUL_IDLE)
 				&&(baud_counter == 0))
 			||((zero_baud_counter)&&(baud_counter == 0))
@@ -520,44 +507,43 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 
 	always @(posedge i_clk)
 	if (!f_past_valid)
-		`PHASE_ONE_ASSERT((state == `RXUL_IDLE)&&(baud_counter == 0)
+		`ASSERT((state == `RXUL_IDLE)&&(baud_counter == 0)
 			&&(zero_baud_counter));
 
 	always @(*)
 	begin
-		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h2);
-		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h4);
-		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h5);
-		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h6);
-		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h9);
-		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'ha);
-		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'hb);
-		`PHASE_ONE_ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'hd);
+		`ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h2);
+		`ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h4);
+		`ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h5);
+		`ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h6);
+		`ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'h9);
+		`ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'ha);
+		`ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'hb);
+		`ASSERT({ ck_uart,qq_uart,q_uart,i_uart_rx } != 4'hd);
 	end
 
 	always @(posedge i_clk)
 	if ((f_past_valid)&&($past(state) >= `RXUL_WAIT)&&($past(ck_uart)))
-		`PHASE_ONE_ASSERT(state == `RXUL_IDLE);
+		`ASSERT(state == `RXUL_IDLE);
 
 	always @(posedge i_clk)
 	if ((f_past_valid)&&($past(state) >= `RXUL_WAIT)
 			&&(($past(state) != `RXUL_IDLE)||(state == `RXUL_IDLE)))
-		`PHASE_ONE_ASSERT(zero_baud_counter);
+		`ASSERT(zero_baud_counter);
 
 	// Calculate an absolute value of the difference between the two baud
 	// clocks
-`ifdef	PHASE_TWO
 	always @(posedge i_clk)
 	if ((f_past_valid)&&($past(state)==`RXUL_IDLE)&&(state == `RXUL_IDLE))
 	begin
-		`PHASE_TWO_ASSERT(($past(ck_uart))
+		`ASSERT(($past(ck_uart))
 			||(chg_counter <=
 				{ 1'b0, CLOCKS_PER_BAUD[(TB-1):1] }));
 	end
 
 	always @(posedge f_txclk)
 	if (!f_past_valid_tx)
-		`PHASE_TWO_ASSERT((state == `RXUL_IDLE)&&(baud_counter == 0)
+		`ASSERT((state == `RXUL_IDLE)&&(baud_counter == 0)
 			&&(zero_baud_counter)&&(!f_tx_busy));
 
 	wire	[(TB+3):0]	f_tx_count_two_clocks_ago;
@@ -570,7 +556,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 
 	localparam	F_SYNC_DLY = 8;
 
-	wire	[(TB+4+F_CKRES-1):0]	f_sub_baud_difference;
+	reg	[(TB+4+F_CKRES-1):0]	f_sub_baud_difference;
 	reg	[F_CKRES-1:0]	ck_tx_clock;
 	reg	[((F_SYNC_DLY-1)*F_CKRES)-1:0]	q_tx_clock;
 	reg	[TB+3:0]	ck_tx_count;
@@ -585,7 +571,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 		{ ck_tx_count, q_tx_count } <= { q_tx_count, f_tx_count };
 
 
-	wire	[TB+4+F_CKRES-1:0]	f_ck_tx_time, f_rx_time;
+	reg	[TB+4+F_CKRES-1:0]	f_ck_tx_time, f_rx_time;
 	always @(*)
 		f_ck_tx_time = { ck_tx_count, !ck_tx_clock[F_CKRES-1],
 						ck_tx_clock[F_CKRES-2:0] };
@@ -593,7 +579,7 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 		f_rx_time = { f_rx_count, !f_rx_clock[1], f_rx_clock[0],
 						{(F_CKRES-2){1'b0}} };
 
-	wire	[TB+4+F_CKRES-1:0]	f_signed_difference;
+	reg	[TB+4+F_CKRES-1:0]	f_signed_difference;
 	always @(*)
 		f_signed_difference = f_ck_tx_time - f_rx_time;
 
@@ -605,47 +591,47 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 
 	always @($global_clock)
 	if (state == `RXUL_WAIT)
-		`PHASE_TWO_ASSERT((!f_tx_busy)||(f_tx_reg[9:1] == 0));
+		`ASSERT((!f_tx_busy)||(f_tx_reg[9:1] == 0));
 
 	always @($global_clock)
 	if (state == `RXUL_IDLE)
 	begin
-		`PHASE_TWO_ASSERT((!f_tx_busy)||(f_tx_reg[9])||(f_tx_reg[9:1]==0));
+		`ASSERT((!f_tx_busy)||(f_tx_reg[9])||(f_tx_reg[9:1]==0));
 		if (!ck_uart)
 			;//`PHASE_TWO_ASSERT((f_rx_count < 4)||(f_sub_baud_difference <= ((CLOCKS_PER_BAUD<<F_CKRES)/20)));
 		else
-			`PHASE_TWO_ASSERT((f_tx_reg[9:1]==0)||(f_tx_count < (3 + CLOCKS_PER_BAUD/2)));
+			`ASSERT((f_tx_reg[9:1]==0)||(f_tx_count < (3 + CLOCKS_PER_BAUD/2)));
 	end else if (state == 0)
-		`PHASE_TWO_ASSERT(f_sub_baud_difference
+		`ASSERT(f_sub_baud_difference
 				<=  2 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 1)
-		`PHASE_TWO_ASSERT(f_sub_baud_difference
+		`ASSERT(f_sub_baud_difference
 				<=  3 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 2)
-		`PHASE_TWO_ASSERT(f_sub_baud_difference
+		`ASSERT(f_sub_baud_difference
 				<=  4 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 3)
-		`PHASE_TWO_ASSERT(f_sub_baud_difference
+		`ASSERT(f_sub_baud_difference
 				<=  5 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 4)
-		`PHASE_TWO_ASSERT(f_sub_baud_difference
+		`ASSERT(f_sub_baud_difference
 				<=  6 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 5)
-		`PHASE_TWO_ASSERT(f_sub_baud_difference
+		`ASSERT(f_sub_baud_difference
 				<=  7 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 6)
-		`PHASE_TWO_ASSERT(f_sub_baud_difference
+		`ASSERT(f_sub_baud_difference
 				<=  8 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 7)
-		`PHASE_TWO_ASSERT(f_sub_baud_difference
+		`ASSERT(f_sub_baud_difference
 				<=  9 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 	else if (state == 8)
-		`PHASE_TWO_ASSERT(f_sub_baud_difference
+		`ASSERT(f_sub_baud_difference
 				<= 10 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
 
 	always @(posedge i_clk)
 	if (o_wr)
-		`PHASE_TWO_ASSERT(o_data == $past(f_tx_data,4));
+		`ASSERT(o_data == $past(f_tx_data,4));
 
 	// always @(posedge i_clk)
 	// if ((zero_baud_counter)&&(state != 4'hf)&&(CLOCKS_PER_BAUD > 6))
@@ -656,38 +642,59 @@ module rxuartlite(i_clk, i_uart_rx, o_wr, o_data);
 	// if ((f_past_valid)&&(state != $past(state)))
 	begin
 		if (state == 4'h0)
-			`PHASE_TWO_ASSERT(!data_reg[7]);
+			`ASSERT(!data_reg[7]);
 
 		if (state == 4'h1)
-			`PHASE_TWO_ASSERT((data_reg[7]
+			`ASSERT((data_reg[7]
 				== $past(f_tx_data[0]))&&(!data_reg[6]));
 
 		if (state == 4'h2)
-			`PHASE_TWO_ASSERT(data_reg[7:6]
+			`ASSERT(data_reg[7:6]
 					== $past(f_tx_data[1:0]));
 
 		if (state == 4'h3)
-			`PHASE_TWO_ASSERT(data_reg[7:5] == $past(f_tx_data[2:0]));
+			`ASSERT(data_reg[7:5] == $past(f_tx_data[2:0]));
 
 		if (state == 4'h4)
-			`PHASE_TWO_ASSERT(data_reg[7:4] == $past(f_tx_data[3:0]));
+			`ASSERT(data_reg[7:4] == $past(f_tx_data[3:0]));
 
 		if (state == 4'h5)
-			`PHASE_TWO_ASSERT(data_reg[7:3] == $past(f_tx_data[4:0]));
+			`ASSERT(data_reg[7:3] == $past(f_tx_data[4:0]));
 
 		if (state == 4'h6)
-			`PHASE_TWO_ASSERT(data_reg[7:2] == $past(f_tx_data[5:0]));
+			`ASSERT(data_reg[7:2] == $past(f_tx_data[5:0]));
 
 		if (state == 4'h7)
-			`PHASE_TWO_ASSERT(data_reg[7:1] == $past(f_tx_data[6:0]));
+			`ASSERT(data_reg[7:1] == $past(f_tx_data[6:0]));
 
 		if (state == 4'h8)
-			`PHASE_TWO_ASSERT(data_reg[7:0] == $past(f_tx_data[7:0]));
+			`ASSERT(data_reg[7:0] == $past(f_tx_data[7:0]));
 	end
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Cover properties
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
+	always @(posedge i_clk)
+		cover(o_wr); // Step 626, takes about 20mins
 
 	always @(posedge i_clk)
-		cover(o_wr);
-`endif
+	begin
+		cover(!ck_uart);
+		cover((f_past_valid)&&($rose(ck_uart)));               //  82
+		cover((zero_baud_counter)&&(state == `RXUL_BIT_ZERO)); // 110
+		cover((zero_baud_counter)&&(state == `RXUL_BIT_ONE));  // 174
+		cover((zero_baud_counter)&&(state == `RXUL_BIT_TWO));  // 238
+		cover((zero_baud_counter)&&(state == `RXUL_BIT_THREE));// 302
+		cover((zero_baud_counter)&&(state == `RXUL_BIT_FOUR)); // 366
+		cover((zero_baud_counter)&&(state == `RXUL_BIT_FIVE)); // 430
+		cover((zero_baud_counter)&&(state == `RXUL_BIT_SIX));  // 494
+		cover((zero_baud_counter)&&(state == `RXUL_BIT_SEVEN));// 558
+		cover((zero_baud_counter)&&(state == `RXUL_STOP));     // 622
+		cover((zero_baud_counter)&&(state == `RXUL_WAIT));     // 626
+	end
+
 `endif
 `ifdef	FORMAL_VERILATOR
 	// FORMAL properties which can be tested via Verilator as well as

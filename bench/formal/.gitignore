@@ -2,10 +2,8 @@
 *.check
 *.vcd
 *.yslog
-rxuartlite_one
-rxuartlite_two
-txuartlite_verific
-txuartlite_yosys
+rxuartlite_*/
+txuartlite_*/
 ufifo
 ctrtest
 txuart

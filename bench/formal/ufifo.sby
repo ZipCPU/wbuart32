@@ -5,7 +5,7 @@ mode prove
 smtbmc
 
 [script]
-read -sv -DUFIFO -formal ufifo.v
+read -formal -DUFIFO ufifo.v
 prep -top ufifo
 
 [files]
