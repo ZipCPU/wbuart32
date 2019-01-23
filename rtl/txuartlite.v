@@ -192,14 +192,14 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	initial	baud_counter = 0;
 	always @(posedge i_clk)
 	begin
-		zero_baud_counter <= (baud_counter == 24'h01);
+		zero_baud_counter <= (baud_counter == 1);
 		if (state == `TXUL_IDLE)
 		begin
-			baud_counter <= 24'h0;
+			baud_counter <= 0;
 			zero_baud_counter <= 1'b1;
 			if ((i_wr)&&(!r_busy))
 			begin
-				baud_counter <= CLOCKS_PER_BAUD - 24'h01;
+				baud_counter <= CLOCKS_PER_BAUD - 1'b1;
 				zero_baud_counter <= 1'b0;
 			end
 		end else if ((zero_baud_counter)&&(state == 4'h9))
@@ -207,9 +207,9 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 			baud_counter <= 0;
 			zero_baud_counter <= 1'b1;
 		end else if (!zero_baud_counter)
-			baud_counter <= baud_counter - 24'h01;
+			baud_counter <= baud_counter - 1'b1;
 		else
-			baud_counter <= CLOCKS_PER_BAUD - 24'h01;
+			baud_counter <= CLOCKS_PER_BAUD - 1'b1;
 	end
 
 //
