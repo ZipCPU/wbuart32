@@ -45,7 +45,7 @@
 `define	UART_RXREG	2'b10
 `define	UART_TXREG	2'b11
 //
-// `define	USE_UART_LITE
+// `define	USE_LITE_UART
 module	wbuart(i_clk, i_rst,
 		//
 		i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data,
