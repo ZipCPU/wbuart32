@@ -44,6 +44,8 @@
 `define	UART_FIFO	2'b01
 `define	UART_RXREG	2'b10
 `define	UART_TXREG	2'b11
+//
+// `define	USE_LITE_UART
 module	wbuart(i_clk, i_rst,
 		//
 		i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data,
@@ -127,7 +129,7 @@ module	wbuart(i_clk, i_rst,
 	// valid when stb is high.
 `ifdef	USE_LITE_UART
 	rxuartlite	#(INITIAL_SETUP[23:0])
-		rx(i_clk, (i_rst), i_uart_rx, rx_stb, rx_uart_data);
+		rx(i_clk, i_uart_rx, rx_stb, rx_uart_data);
 	assign	rx_break = 1'b0;
 	assign	rx_perr  = 1'b0;
 	assign	rx_ferr  = 1'b0;
