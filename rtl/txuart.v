@@ -193,7 +193,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	end else if (state == TXU_BREAK)
 	begin
 		state <= TXU_IDLE;
-		r_busy <= 1'b0;
+		r_busy <= !ck_cts;
 	end else if (state == TXU_IDLE)	// STATE_IDLE
 	begin
 		if ((i_wr)&&(!r_busy))
