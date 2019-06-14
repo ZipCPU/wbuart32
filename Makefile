@@ -63,6 +63,3 @@ clean:
 	cd rtl ; $(MAKE) --no-print-directory clean
 	cd bench/verilog ; $(MAKE) --no-print-directory clean
 	cd bench/cpp     ; $(MAKE) --no-print-directory clean
-	cd doc           ; $(MAKE) --no-print-directory clean
-
-
