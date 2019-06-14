@@ -401,6 +401,11 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	else
 		last_state <= (state == TXU_STOP);
 
+	// Verilator lint_off UNUSED
+	wire	[2:0]	unused;
+	assign	unused = { i_parity_odd, data_bits };
+	// Verilator lint_on  UNUSED
+
 `ifdef	FORMAL
 	reg		fsv_parity;
 	reg	[30:0]	fsv_setup;
