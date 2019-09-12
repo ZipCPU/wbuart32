@@ -82,6 +82,9 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	reg	[7:0]	lcl_data;
 	reg		r_busy, zero_baud_counter;
 
+	// Big state machine controlling: r_busy, state
+	// {{{
+	//
 	initial	r_busy = 1'b1;
 	initial	state  = `TXUL_IDLE;
 	always @(posedge i_clk)
@@ -107,17 +110,21 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 				state <= `TXUL_IDLE;
 		end
 	end
+	// }}}
 
 	// o_busy
+	// {{{
 	//
 	// This is a wire, designed to be true is we are ever busy above.
 	// originally, this was going to be true if we were ever not in the
 	// idle state.  The logic has since become more complex, hence we have
 	// a register dedicated to this and just copy out that registers value.
 	assign	o_busy = (r_busy);
+	// }}}
 
 
 	// lcl_data
+	// {{{
 	//
 	// This is our working copy of the i_data register which we use
 	// when transmitting.  It is only of interest during transmit, and is
@@ -132,8 +139,10 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 			lcl_data <= i_data;
 		else if (zero_baud_counter)
 			lcl_data <= { 1'b1, lcl_data[7:1] };
+	// }}}
 
 	// o_uart_tx
+	// {{{
 	//
 	// This is the final result/output desired of this core.  It's all
 	// centered about o_uart_tx.  This is what finally needs to follow
@@ -145,8 +154,10 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 			o_uart_tx <= 1'b0;	// Set the start bit on writes
 		else if (zero_baud_counter)	// Set the data bit.
 			o_uart_tx <= lcl_data[0];
+	// }}}
 
-
+	// Baud counter
+	// {{{
 	// All of the above logic is driven by the baud counter.  Bits must last
 	// CLOCKS_PER_BAUD in length, and this baud counter is what we use to
 	// make certain of that.
@@ -210,7 +221,7 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 		else
 			baud_counter <= CLOCKS_PER_BAUD - 1'b1;
 	end
-
+	// }}}
 //
 //
 // FORMAL METHODS
@@ -226,7 +237,7 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 `endif
 
 	// Setup
-
+	// {{{
 	reg	f_past_valid, f_last_clk;
 
 	initial	f_past_valid = 1'b0;
@@ -240,8 +251,10 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 			`ASSUME(i_wr   == $past(i_wr));
 			`ASSUME(i_data == $past(i_data));
 		end
+	// }}}
 
 	// Check the baud counter
+	// {{{
 	always @(posedge i_clk)
 		assert(zero_baud_counter == (baud_counter == 0));
 
@@ -267,8 +280,10 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	always @(posedge i_clk)
 		if (baud_counter != 0)
 			assert(o_busy);
+	// }}}
 
 	reg	[9:0]	f_txbits;
+	// {{{
 	initial	f_txbits = 0;
 	always @(posedge i_clk)
 		if (zero_baud_counter)
@@ -316,6 +331,7 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	always @(posedge i_clk)
 	if ((f_past_valid)&&($past(f_past_valid))&&($past(o_busy)))
 		cover(!o_busy);
+	// }}}
 
 `endif	// FORMAL
 `ifdef	VERIFIC_SVA
@@ -332,6 +348,7 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 
 	//
 	// One baud interval
+	// {{{
 	//
 	// 1. The UART output is constant at DAT
 	// 2. The internal state remains constant at ST
@@ -348,9 +365,11 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 			&&(lcl_data == SR)
 			&&(zero_baud_counter);
 	endsequence
+	// }}}
 
 	//
 	// One byte transmitted
+	// {{{
 	//
 	// DATA = the byte that is sent
 	// CKS  = the number of clocks per bit
@@ -367,10 +386,11 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 		##1 BAUD_INTERVAL(CKS, DATA[7], 8'hff, 4'h8)
 		##1 BAUD_INTERVAL(CKS, 1'b1, 8'hff, 4'h9);
 	endsequence
+	// }}}
 
 	//
 	// Transmit one byte
-	//
+	// {{{
 	// Once the byte is transmitted, make certain we return to
 	// idle
 	//
@@ -379,7 +399,9 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 		(i_wr)&&(!o_busy)
 		|=> ((o_busy) throughout SEND(CLOCKS_PER_BAUD,fsv_data))
 		##1 (!o_busy)&&(o_uart_tx)&&(zero_baud_counter));
+	// }}}
 
+	// {{{
 	assume property (
 		@(posedge i_clk)
 		(i_wr)&&(o_busy) |=>
@@ -405,6 +427,7 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	// Insist that we are only ever in a valid state
 	always @(*)
 		assert((state <= `TXUL_STOP+1'b1)||(state == `TXUL_IDLE));
+	// }}}
 
 `endif // Verific SVA
 endmodule
