@@ -1,0 +1,39 @@
+language: cpp
+
+cache: ccache
+
+env:
+  global:
+    - VERILATOR_CACHE=$HOME/verilator_cache
+    - VERILATOR_ROOT=$PWD/verilator
+    - VERILATOR_NUM_JOBS=$((`nproc` + 1))
+    - OBJCACHE=ccache
+
+cache:
+  directories:
+    - $VERILATOR_CACHE
+
+before_install:
+  - git clone https://github.com/verilator/verilator.git $VERILATOR_ROOT
+# This is the first revision with the build_verilator.sh script.
+# Once a Verilator release captures this, it would be best to check out
+# a release tag instead.
+  - git -C $VERILATOR_ROOT checkout 46ab907f6afdcacbf848ea090dce66f1334de663
+
+before_script:
+  - $VERILATOR_ROOT/ci/build_verilator.sh
+
+stages:
+  - build
+  - test
+
+jobs:
+  include:
+    - stage: build
+      name: Build Verilator
+      script: echo "Done building Verilator"
+    - stage: test
+      name: Run Tests
+      script:
+        - make VERILATOR=$VERILATOR_ROOT/bin/verilator test |& tee sim.log
+        - grep -c PASS sim.log | grep -q "^3$"
