@@ -44,11 +44,11 @@
 //
 `default_nettype	none
 //
-module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_err);
+module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_err);
 	parameter	BW=8;	// Byte/data width
 	parameter [3:0]	LGFLEN=4;
-	parameter 	RXFIFO=1'b0;
-	input	wire		i_clk, i_rst;
+	parameter [0:0]	RXFIFO=1'b1;
+	input	wire		i_clk, i_reset;
 	input	wire		i_wr;
 	input	wire [(BW-1):0]	i_data;
 	output	wire		o_empty_n;	// True if something is in FIFO
@@ -60,45 +60,47 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 	localparam	FLEN=(1<<LGFLEN);
 
 	reg	[(BW-1):0]	fifo[0:(FLEN-1)];
-	reg	[(LGFLEN-1):0]	r_first, r_last, r_next;
+	reg	[(BW-1):0]	r_data, last_write;
+	reg	[(LGFLEN-1):0]	wr_addr, rd_addr, r_next;
+	reg			will_overflow, will_underflow;
+	reg			osrc;
 
-	wire	[(LGFLEN-1):0]	w_first_plus_one, w_first_plus_two,
-				w_last_plus_one;
-	assign	w_first_plus_two = r_first + {{(LGFLEN-2){1'b0}},2'b10};
-	assign	w_first_plus_one = r_first + {{(LGFLEN-1){1'b0}},1'b1};
-	assign	w_last_plus_one  = r_next; // r_last  + 1'b1;
+	wire	[(LGFLEN-1):0]	w_waddr_plus_one, w_waddr_plus_two;
+	wire			w_write, w_read;
+	reg	[(LGFLEN-1):0]	r_fill;
+	wire	[3:0]		lglen;
+	wire			w_half_full;
+	reg	[9:0]		w_fill;
 
-	reg	will_overflow;
+	assign	w_write = (i_wr && (!will_overflow || i_rd));
+	assign	w_read  = (i_rd && o_empty_n);
+
+	assign	w_waddr_plus_two = wr_addr + 2;
+	assign	w_waddr_plus_one = wr_addr + 1;
+
 	initial	will_overflow = 1'b0;
 	always @(posedge i_clk)
-		if (i_rst)
-			will_overflow <= 1'b0;
-		else if (i_rd)
-			will_overflow <= (will_overflow)&&(i_wr);
-		else if (i_wr)
-			will_overflow <= (will_overflow)||(w_first_plus_two == r_last);
-		else if (w_first_plus_one == r_last)
-			will_overflow <= 1'b1;
+	if (i_reset)
+		will_overflow <= 1'b0;
+	else if (i_rd)
+		will_overflow <= (will_overflow)&&(i_wr);
+	else if (w_write)
+		will_overflow <= (will_overflow)||(w_waddr_plus_two == rd_addr);
+	else if (w_waddr_plus_one == rd_addr)
+		will_overflow <= 1'b1;
 
 	// Write
-	reg	r_ovfl;
-	initial	r_first = 0;
-	initial	r_ovfl  = 0;
+
+	initial	wr_addr = 0;
 	always @(posedge i_clk)
-		if (i_rst)
-		begin
-			r_ovfl <= 1'b0;
-			r_first <= { (LGFLEN){1'b0} };
-		end else if (i_wr)
-		begin // Cowardly refuse to overflow
-			if ((i_rd)||(!will_overflow)) // (r_first+1 != r_last)
-				r_first <= w_first_plus_one;
-			else
-				r_ovfl <= 1'b1;
-		end
+	if (i_reset)
+		wr_addr <= { (LGFLEN){1'b0} };
+	else if (w_write)
+		wr_addr <= w_waddr_plus_one;
+
 	always @(posedge i_clk)
-		if (i_wr) // Write our new value regardless--on overflow or not
-			fifo[r_first] <= i_data;
+	if (w_write) // Write our new value regardless--on overflow or not
+		fifo[wr_addr] <= i_data;
 
 	// Reads
 	//	Following a read, the next sample will be available on the
@@ -112,143 +114,108 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 	//	5	1	2		fifo[2]
 	//	6	0	3		fifo[3]
 	//	7	0	3		fifo[3]
-	reg	will_underflow;
+
 	initial	will_underflow = 1'b1;
 	always @(posedge i_clk)
-		if (i_rst)
-			will_underflow <= 1'b1;
-		else if (i_wr)
-			will_underflow <= 1'b0;
-		else if (i_rd)
-			will_underflow <= (will_underflow)||(w_last_plus_one == r_first);
-		else
-			will_underflow <= (r_last == r_first);
+	if (i_reset)
+		will_underflow <= 1'b1;
+	else if (i_wr)
+		will_underflow <= 1'b0;
+	else if (w_read)
+		will_underflow <= (will_underflow)||(r_next == wr_addr);
 
 	//
 	// Don't report FIFO underflow errors.  These'll be caught elsewhere
 	// in the system, and the logic below makes it hard to reset them.
 	// We'll still report FIFO overflow, however.
 	//
-	// reg		r_unfl;
-	// initial	r_unfl = 1'b0;
-	initial	r_last = 0;
-	initial	r_next = { {(LGFLEN-1){1'b0}}, 1'b1 };
+	initial	rd_addr = 0;
+	initial	r_next  = 1;
 	always @(posedge i_clk)
-		if (i_rst)
-		begin
-			r_last <= 0;
-			r_next <= { {(LGFLEN-1){1'b0}}, 1'b1 };
-			// r_unfl <= 1'b0;
-		end else if (i_rd)
-		begin
-			if (!will_underflow) // (r_first != r_last)
-			begin
-				r_last <= r_next;
-				r_next <= r_last +{{(LGFLEN-2){1'b0}},2'b10};
-				// Last chases first
-				// Need to be prepared for a possible two
-				// reads in quick succession
-				// o_data <= fifo[r_last+1];
-			end
-			// else r_unfl <= 1'b1;
-		end
+	if (i_reset)
+	begin
+		rd_addr <= 0;
+		r_next  <= 1;
+	end else if (w_read)
+	begin
+		rd_addr <= rd_addr + 1;
+		r_next  <= rd_addr + 2;
+	end
 
-	reg	[(BW-1):0]	fifo_here, fifo_next, r_data;
 	always @(posedge i_clk)
-		fifo_here <= fifo[r_last];
-	always @(posedge i_clk)
-		fifo_next <= fifo[r_next];
-	always @(posedge i_clk)
-		r_data <= i_data;
+	if (w_read)
+		r_data <= fifo[r_next[LGFLEN-1:0]];
 
-	reg	[1:0]	osrc;
 	always @(posedge i_clk)
-		if (will_underflow)
-			// o_data <= i_data;
-			osrc <= 2'b00;
-		else if ((i_rd)&&(r_first == w_last_plus_one))
-			osrc <= 2'b01;
-		else if (i_rd)
-			osrc <= 2'b11;
-		else
-			osrc <= 2'b10;
-	assign o_data = (osrc[1]) ? ((osrc[0])?fifo_next:fifo_here) : r_data;
+	if (i_wr && (!o_empty_n || (w_read && r_next == wr_addr)))
+		last_write <= i_data;
 
-	// wire	[(LGFLEN-1):0]	current_fill;
-	// assign	current_fill = (r_first-r_last);
-
-	reg	r_empty_n;
-	initial	r_empty_n = 1'b0;
+	initial	osrc = 1'b0;
 	always @(posedge i_clk)
-		if (i_rst)
-			r_empty_n <= 1'b0;
-		else casez({i_wr, i_rd, will_underflow})
-			3'b00?: r_empty_n <= (r_first != r_last);
-			3'b010: r_empty_n <= (r_first != w_last_plus_one);
-			3'b10?: r_empty_n <= 1'b1;
-			3'b110: r_empty_n <= (r_first != r_last);
-			3'b111: r_empty_n <= 1'b1;
-			default: begin end
-		endcase
+	if (i_reset)
+		osrc <= 1'b0;
+	else if (i_wr && (!o_empty_n || (w_read && r_next == wr_addr)))
+		osrc <= 1'b1;
+	else if (i_rd)
+		osrc <= 1'b0;
 
-	wire	w_full_n;
-	assign	w_full_n = will_overflow;
+	assign o_data = (osrc) ? last_write : r_data;
 
 	//
 	// If this is a receive FIFO, the FIFO count that matters is the number
-	// of values yet to be read.  If instead this is a transmit FIFO, then 
+	// of values yet to be read.  If instead this is a transmit FIFO, then
 	// the FIFO count that matters is the number of empty positions that
 	// can still be filled before the FIFO is full.
 	//
 	// Adjust for these differences here.
-	reg	[(LGFLEN-1):0]	r_fill;
-	generate
-	if (RXFIFO != 0)
+	generate if (RXFIFO)
+	begin : RXFIFO_FILL
+		//
+		// Calculate the number of elements in our FIFO
+		//
+		// Although used for receive, this is actually the more
+		// generic answer--should you wish to use the FIFO in
+		// another context.
+
 		initial	r_fill = 0;
-	else
+		always @(posedge i_clk)
+		if (i_reset)
+			r_fill <= 0;
+		else case({ w_write, w_read })
+		2'b01:	r_fill <= r_fill - 1'b1;
+		2'b10:	r_fill <= r_fill + 1'b1;
+		default:  begin end
+		endcase
+
+	end else begin : TXFIFO_FILL
+		//
+		// Calculate the number of empty elements in our FIFO
+		//
+		// This is the number you could send to the FIFO
+		// if you wanted to.
+
 		initial	r_fill = -1;
-	endgenerate
+		always @(posedge i_clk)
+		if (i_reset)
+			r_fill <= -1;
+		else case({ w_write, w_read })
+		2'b01:	r_fill <= r_fill + 1'b1;
+		2'b10:	r_fill <= r_fill - 1'b1;
+		default:  begin end
+		endcase
 
-	always @(posedge i_clk)
-		if (RXFIFO!=0) begin
-			// Calculate the number of elements in our FIFO
-			//
-			// Although used for receive, this is actually the more
-			// generic answer--should you wish to use the FIFO in
-			// another context.
-			if (i_rst)
-				r_fill <= 0;
-			else casez({(i_wr), (!will_overflow), (i_rd)&&(!will_underflow)})
-			3'b0?1:   r_fill <= r_first - r_next;
-			3'b110:   r_fill <= r_first - r_last + 1'b1;
-			3'b1?1:   r_fill <= r_first - r_last;
-			default: r_fill <= r_first - r_last;
-			endcase
-		end else begin
-			// Calculate the number of elements that are empty and
-			// can be filled within our FIFO.  Hence, this is really
-			// not the fill, but (SIZE-1)-fill.
-			if (i_rst)
-				r_fill <= { (LGFLEN){1'b1} };
-			else casez({i_wr, (!will_overflow), (i_rd)&&(!will_underflow)})
-			3'b0?1:   r_fill <= r_fill + 1'b1;
-			3'b110:   r_fill <= r_fill - 1'b1;
-			default: r_fill  <= r_fill;
-			endcase
-		end
+	end endgenerate
 
-	// We don't report underflow errors.  These
-	assign o_err = (r_ovfl); //  || (r_unfl);
+	// Flag any overflows
+	assign o_err = (i_wr && !w_write);
 
-	wire	[3:0]	lglen;
 	assign lglen = LGFLEN;
 
-	wire	w_half_full;
-	wire	[9:0]	w_fill;
-	assign	w_fill[(LGFLEN-1):0] = r_fill;
-	generate if (LGFLEN < 10)
-		assign w_fill[9:(LGFLEN)] = 0;
-	endgenerate
+	always @(*)
+	begin
+		w_fill = 0;
+		w_fill[(LGFLEN-1):0] = r_fill;
+	end
 
 	assign	w_half_full = r_fill[(LGFLEN-1)];
 
@@ -263,111 +230,165 @@ module ufifo(i_clk, i_rst, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_er
 		// empty elements within the FIFO that can yet be filled.
 		w_fill,
 		// A '1' here means a half FIFO length can be read (receive
-		// FIFO) or written to (not a receive FIFO).
-		// receive FIFO), or be written to (if it isn't).
-		(RXFIFO!=0)?w_half_full:w_half_full,
+		// FIFO) or written to (not a receive FIFO).  If one, a
+		// halfway interrupt can be sent indicating a half of a FIFOs
+		// operationw (either transmit or receive) will be successful.
+		w_half_full,
 		// A '1' here means the FIFO can be read from (if it is a
-		// receive FIFO), or be written to (if it isn't).
-		(RXFIFO!=0)?r_empty_n:!w_full_n
+		// receive FIFO), or be written to (if it isn't).  An interrupt
+		// may be sourced from this bit, indicating that at least one
+		// operation will be successful.
+		(RXFIFO!=0)?!will_underflow:!will_overflow
 	};
 
-	assign	o_empty_n = r_empty_n;
+	assign	o_empty_n = !will_underflow;
 
+////////////////////////////////////////////////////////////////////////////////
 //
+// Formal property section
 //
-//
-// FORMAL METHODS
-//
-//
-//
+////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
+	reg	f_past_valid;
 
-`ifdef	UFIFO
-`define	ASSUME	assume
-`else
-`define	ASSUME	assert
-`endif
-
-//
-// Assumptions about our input(s)
-//
-//
-	reg	f_past_valid, f_last_clk;
-
-	//
-	// Underflows are a very real possibility, should the user wish to
-	// read from this FIFO while it is empty.  Our parent module will need
-	// to deal with this.
-	//
-	// always @(posedge i_clk)
-	//	`ASSUME((!will_underflow)||(!i_rd)||(i_rst));
-//
-// Assertions about our outputs
-//
-//
-
-	initial	f_past_valid = 1'b0;
+	initial	f_past_valid = 0;
 	always @(posedge i_clk)
-		f_past_valid <= 1'b1;
+		f_past_valid <= 1;
 
-	wire	[(LGFLEN-1):0]	f_fill, f_next, f_empty;
-	assign	f_fill = r_first - r_last;
-	assign	f_empty = {(LGFLEN){1'b1}} -f_fill;
-	assign	f_next = r_last + 1'b1;
-	always @(posedge i_clk)
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Pointer checks
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+	reg	[LGFLEN-1:0]	f_fill;
+	wire	[LGFLEN-1:0]	f_raddr_plus_one;
+
+	always @(*)
+		f_fill = wr_addr - rd_addr;
+
+	always @(*)
+		assert(will_underflow == (f_fill == 0));
+
+	always @(*)
+		assert(will_overflow  == (&f_fill));
+
+	assign	f_raddr_plus_one = rd_addr + 1;
+
+	always @(*)
+		assert(f_raddr_plus_one  == r_next);
+
+	always @(*)
+	if (will_underflow)
 	begin
-		if (RXFIFO)
-			assert(f_fill == r_fill);
-		else
-			assert(f_empty== r_fill);
-		if (f_fill == 0)
-		begin
-			assert(will_underflow);
-			assert(!o_empty_n);
-		end else begin
-			assert(!will_underflow);
-			assert(o_empty_n);
-		end
-
-		if (f_fill == {(LGFLEN){1'b1}})
-			assert(will_overflow);
-		else
-			assert(!will_overflow);
-
-		assert(r_next == f_next);
+		assert(!w_read);
+		assert(!osrc);
 	end
 
-	always @(posedge i_clk)
-	if (f_past_valid)
-	begin
-		if ($past(i_rst))
-			assert(!o_err);
-		else begin
-			// No underflow detection in this core
-			//
-			// if (($past(i_rd))&&($past(r_fill == 0)))
-			//	assert(o_err);
-			//
-			// We do, though, have overflow detection
-			if (($past(i_wr))&&(!$past(i_rd))
-					&&($past(will_overflow)))
-				assert(o_err);
-		end
-	end
 
 	always @(posedge i_clk)
 	if (RXFIFO)
+		assert(r_fill == f_fill);
+	else
+		assert(r_fill == (~f_fill));
+
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Twin write check
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+`ifdef	UFIFO
+	(* anyconst *) reg [LGFLEN-1:0]	f_const_addr;
+	(* anyconst *) reg [BW-1:0]	f_const_data, f_const_second;
+	reg [LGFLEN-1:0]	f_next_addr;
+	reg	[1:0]		f_state;
+	reg			f_first_in_fifo, f_second_in_fifo;
+	reg	[LGFLEN-1:0]	f_distance_to_first, f_distance_to_second;
+
+	always @(*)
 	begin
-		assert(o_status[0] == (f_fill != 0));
-		assert(o_status[1] == (f_fill[LGFLEN-1]));
+		f_next_addr = f_const_addr + 1;
+
+		f_distance_to_first  = f_const_addr - rd_addr;
+		f_distance_to_second = f_next_addr  - rd_addr;
+
+		f_first_in_fifo  = (f_distance_to_first  < f_fill)
+			&& !will_underflow
+			&& (fifo[f_const_addr] == f_const_data);
+		f_second_in_fifo = (f_distance_to_second < f_fill)
+			&& !will_underflow
+			&& (fifo[f_next_addr] == f_const_second);
 	end
 
+	initial	f_state = 2'b00;
 	always @(posedge i_clk)
-	if (!RXFIFO) // Transmit FIFO interrupt flags
-	begin
-		assert(o_status[0] == (!w_full_n));
-		assert(o_status[1] == (!f_fill[LGFLEN-1]));
-	end
+	if (i_reset)
+		f_state <= 2'b00;
+	else case(f_state)
+	2'b00: if (w_write &&(wr_addr == f_const_addr)
+			&&(i_data == f_const_data))
+		f_state <= 2'b01;
+	2'b01: if (w_read && (rd_addr == f_const_addr))
+			f_state <= 2'b00;
+		else if (w_write && (wr_addr == f_next_addr))
+			f_state <= (i_data == f_const_second) ? 2'b10 : 2'b00;
+	2'b10: if (w_read && (rd_addr == f_const_addr))
+			f_state <= 2'b11;
+	2'b11: if (w_read)
+			f_state <= 2'b00;
+	endcase
 
+	always @(*)
+	case(f_state)
+	2'b00: begin end
+	2'b01: begin
+		assert(!will_underflow);
+		assert(f_first_in_fifo);
+		assert(!f_second_in_fifo);
+		assert(wr_addr == f_next_addr);
+		assert(fifo[f_const_addr] == f_const_data);
+		if (rd_addr == f_const_addr)
+			assert(o_data == f_const_data);
+		end
+	2'b10: begin
+		assert(f_first_in_fifo);
+		assert(f_second_in_fifo);
+		end
+	2'b11: begin
+		assert(f_second_in_fifo);
+		assert(rd_addr == f_next_addr);
+		assert(o_data  == f_const_second);
+		end
+	endcase
+`endif
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Cover checks
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+	reg	cvr_filled;
+
+	always @(*)
+		cover(o_empty_n);
+
+`ifdef	UFIFO
+	always @(*)
+		cover(o_err);
+
+	initial	cvr_filled = 0;
+	always @(posedge i_clk)
+	if (i_reset)
+		cvr_filled <= 0;
+	else if (&f_fill[LGFLEN-1:0])
+		cvr_filled <= 1;
+
+	always @(*)
+		cover(cvr_filled && !o_empty_n);
+`endif // UFIFO
 `endif
 endmodule

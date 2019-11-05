@@ -1,9 +1,5 @@
-*.smt2
-*.check
-*.vcd
-*.yslog
 rxuartlite_*/
 txuartlite_*/
-ufifo
+ufifo_*/
 ctrtest
 txuart

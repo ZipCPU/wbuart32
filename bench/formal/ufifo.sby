@@ -1,11 +1,18 @@
+[tasks]
+prf
+cvr
+
 [options]
-mode prove
+prf: mode prove
+prf: depth 4
+cvr: mode cover
+cvr: depth 32
 
 [engines]
 smtbmc
 
 [script]
-read -formal -DUFIFO ufifo.v
+read -formal -D UFIFO ufifo.v
 prep -top ufifo
 
 [files]

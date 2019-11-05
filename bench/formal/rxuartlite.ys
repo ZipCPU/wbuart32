@@ -1,6 +1,0 @@
-read_verilog -D TXUARTLITE -formal ../../rtl/rxuartlite.v
-chparam -set CLOCKS_PER_BAUD 16
-prep -top rxuartlite -nordff
-clk2fflogic
-opt -share_all
-write_smt2 -wires rxuartlite.smt2

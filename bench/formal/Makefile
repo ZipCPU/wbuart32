@@ -49,7 +49,7 @@ TXLITE:= txuartlite
 RX    := rxuartlite
 
 .PHONY: $(FIFO) $(TX) $(RX) $(TXLITE)
-$(FIFO): $(FIFO)/PASS
+$(FIFO): $(FIFO)_prf/PASS $(FIFO)_cvr/PASS
 $(TX): $(TX)/PASS
 $(RX): $(RX)_prf/PASS $(RX)_cvr/PASS
 $(TXLITE): $(TXLITE)_cvr/PASS $(TXLITE)_prf/PASS
@@ -67,9 +67,13 @@ $(TXLITE)_cvr/PASS:     $(TXLITE).sby $(RTL)/$(TXLITE).v
 $(TXLITE)_prf/PASS:     $(TXLITE).sby $(RTL)/$(TXLITE).v
 	sby -f $(TXLITE).sby prf
 
-$(FIFO)/PASS:   $(FIFO).sby $(RTL)/$(FIFO).v
-	sby -f $(FIFO).sby
+$(FIFO)_prf/PASS:   $(FIFO).sby $(RTL)/$(FIFO).v
+	sby -f $(FIFO).sby prf
+
+$(FIFO)_cvr/PASS:   $(FIFO).sby $(RTL)/$(FIFO).v
+	sby -f $(FIFO).sby cvr
 
 .PHONY: clean
 clean:
-	rm -rf $(FIFO)/ $(RX)_*/ $(TX)/ $(TXLITE)_cvr/ $(TXLITE)_prf/
+	rm -rf $(FIFO)_prf/ $(FIFO)_cvr/
+	rm -rf $(RX)_*/ $(TX)/ $(TXLITE)_cvr/ $(TXLITE)_prf/
