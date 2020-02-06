@@ -39,7 +39,9 @@
 ################################################################################
 ##
 ##
+.PHONY: all
 all:	test tags
+.DELETE_ON_ERROR:
 YYMMDD=`date +%Y%m%d`
 CXX   := g++
 FBDIR := .
