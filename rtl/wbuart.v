@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2019, Gisselquist Technology, LLC
+// Copyright (C) 2015-2020, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -48,8 +48,8 @@
 // `define	USE_LITE_UART
 module	wbuart(i_clk, i_rst,
 		//
-		i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data,
-			o_wb_ack, o_wb_stall, o_wb_data,
+		i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data, i_wb_sel,
+			o_wb_stall, o_wb_ack, o_wb_data,
 		//
 		i_uart_rx, o_uart_tx, i_cts_n, o_rts_n,
 		//
@@ -69,9 +69,10 @@ module	wbuart(i_clk, i_rst,
 	input	wire		i_wb_cyc;	// We ignore CYC for efficiency
 	input	wire		i_wb_stb, i_wb_we;
 	input	wire	[1:0]	i_wb_addr;
-	input	wire	[31:0]	i_wb_data;	// and only use 30 lines here
-	output	reg		o_wb_ack;
+	input	wire	[31:0]	i_wb_data;
+	input	wire	[3:0]	i_wb_sel;
 	output	wire		o_wb_stall;
+	output	reg		o_wb_ack;
 	output	reg	[31:0]	o_wb_data;
 	//
 	input	wire		i_uart_rx;
@@ -402,10 +403,14 @@ module	wbuart(i_clk, i_rst,
 
 	// Likewise, the acknowledgement is delayed by one clock.
 	reg	r_wb_ack;
+
+	initial	r_wb_ack = 1'b0;
 	always @(posedge i_clk) // We'll ACK in two clocks
 		r_wb_ack <= i_wb_stb;
+
+	initial	o_wb_ack = 1'b0;
 	always @(posedge i_clk) // Okay, time to set the ACK
-		o_wb_ack <= r_wb_ack;
+		o_wb_ack <= i_wb_cyc && r_wb_ack;
 
 	// Finally, set the return data.  This data must be valid on the same
 	// clock o_wb_ack is high.  On all other clocks, it is irrelelant--since
@@ -427,8 +432,8 @@ module	wbuart(i_clk, i_rst,
 
 	// Make verilator happy
 	// verilator lint_off UNUSED
-	wire	[33:0] unused;
-	assign	unused = { i_rst, i_wb_cyc, i_wb_data };
+	wire	unused;
+	assign	unused = &{ 1'b0, i_rst, i_wb_cyc, i_wb_data, i_wb_sel };
 	// verilator lint_on UNUSED
 
 endmodule

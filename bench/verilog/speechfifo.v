@@ -21,7 +21,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2017, Gisselquist Technology, LLC
+// Copyright (C) 2015-2020, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -278,8 +278,8 @@ module	speechfifo(i_clk,
 	// to run/test it.
 	wbuart	#(INITIAL_UART_SETUP)
 		wbuarti(i_clk, pwr_reset,
-			wb_stb, wb_stb, 1'b1, wb_addr, wb_data,
-			uart_ack, uart_stall, uart_data,
+			wb_stb, wb_stb, 1'b1, wb_addr, wb_data, 4'hf,
+			uart_stall, uart_ack, uart_data,
 			1'b1, o_uart_tx, cts_n, rts_n_ignored,
 			ignored_rx_int, tx_int,
 			ignored_rxfifo_int, txfifo_int);
