@@ -129,7 +129,7 @@ module	wbuart(i_clk, i_rst,
 	// a stb (true when new data is ready), and an 8-bit data out value
 	// valid when stb is high.
 `ifdef	USE_LITE_UART
-	rxuartlite	#(INITIAL_SETUP[23:0])
+	rxuartlite	#(.CLOCKS_PER_BAUD(INITIAL_SETUP[23:0]))
 		rx(i_clk, i_uart_rx, rx_stb, rx_uart_data);
 	assign	rx_break = 1'b0;
 	assign	rx_perr  = 1'b0;
@@ -138,7 +138,7 @@ module	wbuart(i_clk, i_rst,
 `else
 	// The full receiver also produces a break value (true during a break
 	// cond.), and parity/framing error flags--also valid when stb is true.
-	rxuart	#(INITIAL_SETUP) rx(i_clk, (i_rst)||(rx_uart_reset),
+	rxuart	#(.INITIAL_SETUP(INITIAL_SETUP)) rx(i_clk, (i_rst)||(rx_uart_reset),
 			uart_setup, i_uart_rx,
 			rx_stb, rx_uart_data, rx_break,
 			rx_perr, rx_ferr, ck_uart);
@@ -350,7 +350,7 @@ module	wbuart(i_clk, i_rst,
 			tx_uart_reset <= 1'b0;
 
 `ifdef	USE_LITE_UART
-	txuartlite #(INITIAL_SETUP[23:0]) tx(i_clk, (tx_empty_n), tx_data,
+	txuartlite #(.CLOCKS_PER_BAUD(INITIAL_SETUP[23:0])) tx(i_clk, (tx_empty_n), tx_data,
 			o_uart_tx, tx_busy);
 `else
 	wire	cts_n;
@@ -364,7 +364,7 @@ module	wbuart(i_clk, i_rst,
 	// we read it here.  (You might notice above, we register a read any
 	// time (tx_empty_n) and (!tx_busy) are both true---the condition for
 	// starting to transmit a new byte.)
-	txuart	#(INITIAL_SETUP) tx(i_clk, 1'b0, uart_setup,
+	txuart	#(.INITIAL_SETUP(INITIAL_SETUP)) tx(i_clk, 1'b0, uart_setup,
 			r_tx_break, (tx_empty_n), tx_data,
 			cts_n, o_uart_tx, tx_busy);
 `endif
