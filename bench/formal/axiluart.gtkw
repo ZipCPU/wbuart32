@@ -1,0 +1,67 @@
+[*]
+[*] GTKWave Analyzer v3.3.86 (w)1999-2017 BSI
+[*] Tue Jun  9 12:45:44 2020
+[*]
+[dumpfile] "(null)"
+[timestart] 0
+[size] 1920 1021
+[pos] -1 -1
+*-3.760617 43 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 270
+[signals_width] 280
+[sst_expanded] 1
+[sst_vpaned_height] 290
+@28
+axiluart.S_AXI_ACLK
+axiluart.S_AXI_ARESETN
+@200
+-
+@28
+axiluart.S_AXI_AWVALID
+axiluart.S_AXI_AWREADY
+@22
+axiluart.S_AXI_AWADDR[3:0]
+@28
+axiluart.S_AXI_AWPROT[2:0]
+@200
+-
+@28
+axiluart.S_AXI_WVALID
+axiluart.S_AXI_WREADY
+@22
+axiluart.S_AXI_WDATA[31:0]
+axiluart.S_AXI_WSTRB[3:0]
+@28
+axiluart.S_AXI_BVALID
+@200
+-
+@28
+axiluart.S_AXI_BREADY
+axiluart.S_AXI_BRESP[1:0]
+@200
+-
+@29
+axiluart.S_AXI_ARVALID
+axiluart.S_AXI_ARREADY
+@23
+axiluart.S_AXI_ARADDR[3:0]
+@29
+axiluart.S_AXI_ARPROT[2:0]
+@201
+-
+@28
+axiluart.S_AXI_RVALID
+axiluart.S_AXI_RREADY
+@22
+axiluart.S_AXI_RDATA[31:0]
+@28
+axiluart.S_AXI_RRESP[1:0]
+@22
+axiluart.faxil_rd_outstanding[3:0]
+@28
+axiluart.r_preread
+axiluart.r_axil_addr[1:0]
+@22
+axiluart.uart_setup[30:0]
+[pattern_trace] 1
+[pattern_trace] 0

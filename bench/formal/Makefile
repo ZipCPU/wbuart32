@@ -38,7 +38,7 @@
 ################################################################################
 ##
 ##
-TESTS := ufifo txuartlite rxuartlite txuart
+TESTS := ufifo txuartlite rxuartlite txuart axiluart
 .PHONY: $(TESTS)
 all: $(TESTS)
 RTL := ../../rtl
@@ -47,12 +47,14 @@ FIFO  := ufifo
 TX    := txuart
 TXLITE:= txuartlite
 RX    := rxuartlite
+AXIL  := AXILUART
 
 .PHONY: $(FIFO) $(TX) $(RX) $(TXLITE)
 $(FIFO): $(FIFO)_prf/PASS $(FIFO)_cvr/PASS
 $(TX): $(TX)/PASS
 $(RX): $(RX)_prf/PASS $(RX)_cvr/PASS
 $(TXLITE): $(TXLITE)_cvr/PASS $(TXLITE)_prf/PASS
+$(AXIL): $(AXIL)_cvr/PASS $(AXIL)_prf/PASS $(AXIL)_cvrs/PASS $(AXIL)_prfs/PASS
 
 $(TX)/PASS:     $(TX).sby $(RTL)/$(TX).v
 	sby -f $(TX).sby
@@ -69,11 +71,21 @@ $(TXLITE)_prf/PASS:     $(TXLITE).sby $(RTL)/$(TXLITE).v
 
 $(FIFO)_prf/PASS:   $(FIFO).sby $(RTL)/$(FIFO).v
 	sby -f $(FIFO).sby prf
-
 $(FIFO)_cvr/PASS:   $(FIFO).sby $(RTL)/$(FIFO).v
 	sby -f $(FIFO).sby cvr
+
+AXILDEPS := $(AXIL).sby $(RTL)/$(AXIL).v $(RTL)/$(FIFO).v $(RTL)/skidbuffer.v faxil_slave.v
+$(AXIL)_prf/PASS:   $(AXILDEPS)
+	sby -f $(AXIL).sby prf
+$(AXIL)_cvr/PASS:   $(AXILDEPS)
+	sby -f $(AXIL).sby cvr
+$(AXIL)_prfs/PASS:   $(AXILDEPS)
+	sby -f $(AXIL).sby prfs
+$(AXIL)_cvrs/PASS:   $(AXILDEPS)
+	sby -f $(AXIL).sby cvrs
 
 .PHONY: clean
 clean:
 	rm -rf $(FIFO)_prf/ $(FIFO)_cvr/
-	rm -rf $(RX)_*/ $(TX)/ $(TXLITE)_cvr/ $(TXLITE)_prf/
+	rm -rf $(RX)_*/  $(TX)/ $(TXLITE)_cvr/ $(TXLITE)_prf/
+	rm -rf $(AXIL)_*/

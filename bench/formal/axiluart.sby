@@ -1,0 +1,29 @@
+[tasks]
+prf
+prfs	prf	opt_skidbuffer
+cvr
+cvrs	cvr	opt_skidbuffer
+
+[options]
+prf: mode prove
+prf: depth 5
+cvr: mode cover
+cvr: depth 32
+
+[engines]
+smtbmc
+
+[script]
+read -formal ufifo.v
+read -formal axiluart.v
+read -formal skidbuffer.v
+read -formal faxil_slave.v
+opt_skidbuffer:  hierarchy -top axiluart -chparam OPT_SKIDBUFFER 1
+~opt_skidbuffer: hierarchy -top axiluart -chparam OPT_SKIDBUFFER 0
+prep -top axiluart
+
+[files]
+../../rtl/ufifo.v
+../../rtl/skidbuffer.v
+../../rtl/axiluart.v
+faxil_slave.v
