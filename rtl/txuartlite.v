@@ -227,11 +227,18 @@ module txuartlite #(
 			end
 		end else if (!zero_baud_counter)
 			baud_counter <= baud_counter - 1'b1;
-		else if ((zero_baud_counter)&&(state > TXUL_STOP))
+		else if (state > TXUL_STOP)
 		begin
 			baud_counter <= 0;
 			zero_baud_counter <= 1'b1;
-		end else // All other states
+		end else if (state == TXUL_STOP)
+			// Need to complete this state one clock early, so
+			// we can release busy one clock before the stop bit
+			// is complete, so we can start on the next byte
+			// exactly 10*CLOCKS_PER_BAUD clocks after we started
+			// the last one
+			baud_counter <= CLOCKS_PER_BAUD - 2;
+		else // All other states
 			baud_counter <= CLOCKS_PER_BAUD - 1'b1;
 	end
 	// }}}
@@ -403,7 +410,7 @@ module txuartlite #(
 		##1 BAUD_INTERVAL(CKS, DATA[5], {{(6){1'b1}},DATA[7:6]}, 4'h6)
 		##1 BAUD_INTERVAL(CKS, DATA[6], {{(7){1'b1}},DATA[7:7]}, 4'h7)
 		##1 BAUD_INTERVAL(CKS, DATA[7], 8'hff, 4'h8)
-		##1 BAUD_INTERVAL(CKS, 1'b1, 8'hff, 4'h9);
+		##1 BAUD_INTERVAL(CKS-1, 1'b1, 8'hff, 4'h9);
 	endsequence
 	// }}}
 
