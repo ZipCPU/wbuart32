@@ -47,7 +47,7 @@ FIFO  := ufifo
 TX    := txuart
 TXLITE:= txuartlite
 RX    := rxuartlite
-AXIL  := AXILUART
+AXIL  := axiluart
 
 .PHONY: $(FIFO) $(TX) $(RX) $(TXLITE)
 $(FIFO): $(FIFO)_prf/PASS $(FIFO)_cvr/PASS
