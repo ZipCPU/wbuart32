@@ -10,7 +10,7 @@ prf: depth  110
 cvr: depth  720
 
 [engines]
-smtbmc boolector
+smtbmc yices
 
 [script]
 prf: read -formal -DRXUARTLITE -D PHASE_TWO rxuartlite.v

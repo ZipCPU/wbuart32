@@ -114,8 +114,8 @@ module	axiluart #(
 		// will pause.
 		//
 		// If you don't wish to use hardware flow control, just set
-		// i_rts_n to 1'b0 and let the optimizer simply remove this
-		// logic.
+		// HARDWARE_FLOW_CONTROL_PRESENT to 1'b0 and let the optimizer
+		// simply remove this logic.
 		output	reg		o_rts_n,
 		// }}}
 		// A series of outgoing interrupts to select from among
