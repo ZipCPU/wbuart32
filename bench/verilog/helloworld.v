@@ -70,6 +70,7 @@ module	helloworld(i_clk,
 	input		i_clk;
 	output	wire	o_uart_tx;
 
+`ifdef	OPT_STANDALONE
 	// Here we set i_setup to something appropriate to create a 115200 Baud
 	// UART system from a 100MHz clock.  This also sets us to an 8-bit data
 	// word, 1-stop bit, and no parity.  This will be overwritten by
@@ -79,7 +80,6 @@ module	helloworld(i_clk,
 	// The i_setup wires are input when run under Verilator, but need to
 	// be set internally if this is going to run as a standalone top level
 	// test configuration.
-`ifdef	OPT_STANDALONE
 	wire	[30:0]	i_setup;
 	assign	i_setup = INITIAL_UART_SETUP;
 `else
