@@ -80,13 +80,13 @@ module txuartlite #(
 	// Register/net declarations
 	// {{{
 	localparam [3:0]	TXUL_BIT_ZERO  = 4'h0,
-				TXUL_BIT_ONE   = 4'h1,
-				TXUL_BIT_TWO   = 4'h2,
-				TXUL_BIT_THREE = 4'h3,
-				TXUL_BIT_FOUR  = 4'h4,
-				TXUL_BIT_FIVE  = 4'h5,
-				TXUL_BIT_SIX   = 4'h6,
-				TXUL_BIT_SEVEN = 4'h7,
+			//	TXUL_BIT_ONE   = 4'h1,
+			//	TXUL_BIT_TWO   = 4'h2,
+			//	TXUL_BIT_THREE = 4'h3,
+			//	TXUL_BIT_FOUR  = 4'h4,
+			//	TXUL_BIT_FIVE  = 4'h5,
+			//	TXUL_BIT_SIX   = 4'h6,
+			//	TXUL_BIT_SEVEN = 4'h7,
 				TXUL_STOP      = 4'h8,
 				TXUL_IDLE      = 4'hf;
 

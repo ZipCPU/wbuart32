@@ -74,7 +74,9 @@ module	helloworld(i_clk,
 	// UART system from a 100MHz clock.  This also sets us to an 8-bit data
 	// word, 1-stop bit, and no parity.  This will be overwritten by
 	// i_setup, but at least it gives us something to start with/from.
+	// verilator lint_off UNUSED
 	parameter	INITIAL_UART_SETUP = 31'd868;
+	// verilator lint_on UNUSED
 
 	// The i_setup wires are input when run under Verilator, but need to
 	// be set internally if this is going to run as a standalone top level

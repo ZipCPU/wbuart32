@@ -104,9 +104,9 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	localparam 	[3:0]	TXU_BIT_ONE   = 4'h1;
 	localparam 	[3:0]	TXU_BIT_TWO   = 4'h2;
 	localparam 	[3:0]	TXU_BIT_THREE = 4'h3;
-	localparam 	[3:0]	TXU_BIT_FOUR  = 4'h4;
-	localparam 	[3:0]	TXU_BIT_FIVE  = 4'h5;
-	localparam 	[3:0]	TXU_BIT_SIX   = 4'h6;
+	// localparam 	[3:0]	TXU_BIT_FOUR  = 4'h4;
+	// localparam 	[3:0]	TXU_BIT_FIVE  = 4'h5;
+	// localparam 	[3:0]	TXU_BIT_SIX   = 4'h6;
 	localparam 	[3:0]	TXU_BIT_SEVEN = 4'h7;
 	localparam 	[3:0]	TXU_PARITY    = 4'h8;
 	localparam 	[3:0]	TXU_STOP      = 4'h9;
