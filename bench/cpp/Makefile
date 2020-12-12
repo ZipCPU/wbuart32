@@ -71,7 +71,7 @@
 ##
 ##
 CXX	:= g++
-FLAGS	:= -Wall -Og -g
+FLAGS	:= -std=c++11 -Wall -Og -g
 OBJDIR  := obj-pc
 RTLD	:= ../verilog
 VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
@@ -147,7 +147,7 @@ test: linetest speechtest
 define	build-depends
 	$(mk-objdir)
 	@echo "Building dependency file"
-	@$(CXX) $(CFLAGS) $(INCS) -MM $(SOURCES) > $(OBJDIR)/xdepends.txt
+	@$(CXX) $(FLAGS) $(INCS) -MM $(SOURCES) > $(OBJDIR)/xdepends.txt
 	@sed -e 's/^.*.o: /$(OBJDIR)\/&/' < $(OBJDIR)/xdepends.txt > $(OBJDIR)/depends.txt
 	@rm $(OBJDIR)/xdepends.txt
 endef
