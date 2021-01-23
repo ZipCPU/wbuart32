@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	linetest.cpp
-//
+// {{{
 // Project:	wbuart32, a full featured UART with simulator
 //
 // Purpose:	To create a pass-through test of the receiver and transmitter
@@ -19,9 +19,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -36,14 +36,15 @@
 // with this program.  (It's in the $(ROOT)/doc directory, run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <verilatedos.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -54,19 +55,27 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include "verilated.h"
+#ifdef	USE_UART_LITE
+#include "Vlinetestlite.h"
+#define	SIMCLASS	Vlinetestlite
+#else
 #include "Vlinetest.h"
+#define	SIMCLASS	Vlinetest
+#endif
 #include "verilated_vcd_c.h"
 #include "uartsim.h"
 
 int	main(int argc, char **argv) {
 	Verilated::commandArgs(argc, argv);
-	Vlinetest	tb;
+	SIMCLASS	tb;
 	UARTSIM		*uart;
 	bool		run_interactively = false;
 	int		port = 0;
 	unsigned	setup = 868;
 	char string[] = "This is a UART testing string\r\n";
 
+	// Argument processing
+	// {{{
 	for(int argn=1; argn<argc; argn++) {
 		if (argv[argn][0] == '-') for(int j=1; (j<1000)&&(argv[argn][j]); j++)
 		switch(argv[argn][j]) {
@@ -85,11 +94,17 @@ int	main(int argc, char **argv) {
 				break;
 		}
 	}
+	// }}}
 
+	// Setup the baud rate
+	// {{{
 	tb.i_setup = setup;
 	int baudclocks = setup & 0x0ffffff;
 	tb.i_uart_rx = 1;
+	// }}}
+
 	if (run_interactively) {
+		// {{{
 		uart = new UARTSIM(port);
 		uart->setup(tb.i_setup);
 
@@ -102,8 +117,10 @@ int	main(int argc, char **argv) {
 
 			tb.i_uart_rx = (*uart)(tb.o_uart_tx);
 		}
-
+		// }}}
 	} else {
+		// Set up a child process
+		// {{{
 		int	childs_stdin[2], childs_stdout[2];
 
 		if ((pipe(childs_stdin)!=0)||(pipe(childs_stdout) != 0)) {
@@ -121,8 +138,10 @@ int	main(int argc, char **argv) {
 			printf("TEST FAILURE\n");
 			exit(EXIT_FAILURE);
 		}
+		// }}}
 
-		if (childs_pid) {
+		if (childs_pid) { // The parent, feeding the simulation
+			// {{{
 			int	nr=-2, nw;
 
 			// We are the parent
@@ -177,7 +196,12 @@ int	main(int argc, char **argv) {
 				printf("TEST FAILED\n");
 				exit(EXIT_FAILURE);
 			}
-		} else {
+			// }}}
+		} else { // The child (Verilator simulation)
+			// {{{
+
+			// Fix up the FILE I/O
+			// {{{
 			close(childs_stdin[ 1]);
 			close(childs_stdout[0]);
 			close(STDIN_FILENO);
@@ -196,6 +220,7 @@ int	main(int argc, char **argv) {
 			// UARTSIM(0) uses stdin and stdout for its FD's
 			uart = new UARTSIM(0);
 			uart->setup(tb.i_setup);
+			// }}}
 
 			// Make sure we don't run longer than 4 seconds ...
 			time_t	start = time(NULL);
@@ -203,6 +228,8 @@ int	main(int argc, char **argv) {
 			unsigned	clocks = 0;
 			bool	done = false;
 
+			// VCD trace setup
+			// {{{
 #define	VCDTRACE
 #ifdef	VCDTRACE
 			Verilated::traceEverOn(true);
@@ -217,9 +244,11 @@ int	main(int argc, char **argv) {
 #define	TRACE_NEGEDGE	while(0)
 #define	TRACE_CLOSE	while(0)
 #endif
+			// }}}
 
+			// Clear any initial break condition
+			// {{{
 			for(int i=0; i<(baudclocks*24); i++) {
-				// Clear any initial break condition
 				tb.i_clk = 1;
 				tb.eval();
 				tb.i_clk = 0;
@@ -227,7 +256,10 @@ int	main(int argc, char **argv) {
 
 				tb.i_uart_rx = 1;
 			}
+			// }}}
 
+			// Simulation loop: process the hello world string
+			// {{{
 			while(clocks < 2*(baudclocks*16)*strlen(string)) {
 				tb.i_clk = 1;
 				tb.eval();
@@ -239,7 +271,8 @@ int	main(int argc, char **argv) {
 
 				tb.i_uart_rx = (*uart)(tb.o_uart_tx);
 
-				if (false) {
+				if (false) { // Used only for debugging
+					// {{{
 					/*
 					static long counts = 0;
 					static int lasti = 1, lasto = 1;
@@ -268,6 +301,7 @@ int	main(int argc, char **argv) {
 						tb.v__DOT__transmitter__DOT__zero_baud_counter,
 						tb.v__DOT__transmitter__DOT__baud_counter);
 					} */
+					// }}}
 				}
 
 				if (iterations_before_check-- <= 0) {
@@ -277,10 +311,12 @@ int	main(int argc, char **argv) {
 					fprintf(stderr, "CHILD-TIMEOUT\n");
 				}
 			}
+			// }}}
 
 			TRACE_CLOSE;
 
 			exit(EXIT_SUCCESS);
+			// }}}
 		}
 	}
 }

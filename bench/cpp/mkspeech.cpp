@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	mkspeech.cpp
-//
+// {{{
 // Project:	wbuart32, a full featured UART with simulator
 //
 // Purpose:	To turn a text file (i.e. the Gettysburg address) into a 
@@ -11,9 +11,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -28,14 +28,15 @@
 // with this program.  (It's in the $(ROOT)/doc directory, run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -43,7 +44,7 @@
 
 /*
 * endswith
-*
+* {{{
 * Real simple: returns true if the given string ends with the given ending.
 * Useful for determining if a file ends with the extension .txt.
 *
@@ -56,10 +57,11 @@ bool	endswith(const char *str, const char *ending) {
 		return false;
 	return true;
 }
+// }}}
 
 /*
 * usage()
-*
+* {{{
 * Tell the user the calling conventions of this program, and what the program
 * can be used to accomplish.
 */
@@ -75,12 +77,15 @@ void	usage(void) {
 "\tISE).  In this case, the output filename defaults to \'speech.inc\'.\n"
 "\n\n");
 }
+// }}}
 
 int main(int argc, char **argv) {
 	FILE	*fp, *fout;
 	const	char	*input_filename = NULL, *output_filename = NULL;
 	bool	xise_file = false;
 
+	// Argument processing
+	// {{{
 	for(int argn=1; argn < argc; argn++) {
 		if (argv[argn][0] == '-') {
 			if (argv[argn][2] == '\0') {
@@ -112,18 +117,27 @@ int main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 	}
+	// }}}
 
+	// The input file name must not be NULL
+	// {{{
 	if (input_filename== NULL) {
 		fprintf(stderr, "No filename given\n");
 		usage();
 		exit(EXIT_FAILURE);
 	}
+	// }}}
 
+	// Make sure our inupt name ends with .txt
+	// {{{
 	if (!endswith(input_filename, ".txt")) {
 		fprintf(stderr, "Err: %s is an invalid text file name\n", input_filename);
 		exit(EXIT_FAILURE);
 	}
+	// }}}
 
+	// Make sure we can read the input file
+	// {{{
 	if (access(input_filename, F_OK)!=0) {
 		fprintf(stderr, "Err: %s is not a file\n", input_filename);
 		exit(EXIT_FAILURE);
@@ -131,13 +145,19 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "Err: Cannot read %s\n", input_filename);
 		exit(EXIT_FAILURE);
 	}
+	// }}}
 
+	// Open the input file
+	// {{{
 	fp = fopen(input_filename, "r");
 	if (fp == NULL) {
 		fprintf(stderr, "Err: Cannot read %s\n", input_filename);
 		exit(EXIT_FAILURE);
 	}
+	// }}}
 
+	// Open the output file
+	// {{{
 	if (output_filename == NULL)
 		output_filename = (xise_file) ? "speech.inc" : "speech.hex";
 
@@ -146,9 +166,12 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "Err: Cannot write %s\n", output_filename);
 		exit(EXIT_FAILURE);
 	}
+	// }}}
 
 	if (xise_file) {
-		// Build an include file
+		// ISE can't handle $readmemh, so let's build an include file
+		// {{{
+		// instead
 		int	ch, addr = 0;
 		while((ch = fgetc(fp))!=EOF) {
 			if (ch == '\n')
@@ -160,8 +183,10 @@ int main(int argc, char **argv) {
 
 		for(; addr<2048; addr++)
 			fprintf(fout, "\t\tmessage[%4d] = 8'h%02x;\n", addr, ' ');
+		// }}}
 	} else {
-		// Bulid a proper hex file
+		// Bulid a proper hex file for $readmemh
+		// {{{
 		int	linelen = 0;
 		int	ch, addr = 0;
 
@@ -183,6 +208,7 @@ int main(int argc, char **argv) {
 				fprintf(fout, "@%08x ", addr); linelen += 4+6;
 			}
 		} fprintf(fout, "\n");
+		// }}}
 	}
 	fclose(fp);
 	fclose(fout);

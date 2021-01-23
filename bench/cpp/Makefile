@@ -1,7 +1,7 @@
 ################################################################################
 ##
 ## Filename: 	Makefile
-##
+## {{{
 ## Project:	wbuart32, a full featured UART with simulator
 ##
 ## Purpose:	To test a group of Verilator modules: txuart (UART transmitter),
@@ -45,9 +45,9 @@
 ##		Gisselquist Technology, LLC
 ##
 ################################################################################
-##
-## Copyright (C) 2015-2020, Gisselquist Technology, LLC
-##
+## }}}
+## Copyright (C) 2015-2021, Gisselquist Technology, LLC
+## {{{
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
 ## by the Free Software Foundation, either version 3 of the License, or (at
@@ -82,19 +82,8 @@ VOBJDR	:= $(RTLD)/obj_dir
 SYSVDR	:= $(VROOT)/include
 VSRC	:= verilated.cpp verilated_vcd_c.cpp
 VLIB	:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(VSRC)))
-# Sources necessary to build the linetest program (rxuart-txuart test)
-LINSRCS := linetest.cpp uartsim.cpp
-LINOBJ := $(subst .cpp,.o,$(LINSRCS))
-LINOBJS:= $(addprefix $(OBJDIR)/,$(LINOBJ)) $(VLIB)
-# Sources necessary to build the helloworld test (txuart test)
-HLOSRCS := helloworld.cpp uartsim.cpp
-HLOOBJ := $(subst .cpp,.o,$(HLOSRCS))
-HLOOBJS:= $(addprefix $(OBJDIR)/,$(HLOOBJ)) $(VLIB)
-# Sources necessary to build the speech test (wbuart test)
-SPCHSRCS:= speechtest.cpp uartsim.cpp
-SPCHOBJ := $(subst .cpp,.o,$(SPCHSRCS))
-SPCHOBJS:= $(addprefix $(OBJDIR)/,$(SPCHOBJ)) $(VLIB)
-all:	$(OBJDIR)/ linetest helloworld speechtest test
+## }}}
+all:	$(OBJDIR)/ linetest linetestlite helloworld helloworldlite speechtest speechtestlite test
 
 $(OBJDIR)/uartsim.o: uartsim.cpp uartsim.h
 
@@ -106,11 +95,51 @@ $(OBJDIR)/%.o: $(SYSVDR)/%.cpp
 	$(mk-objdir)
 	$(CXX) $(FLAGS) $(INCS) -c $< -o $@
 
+## linetest
+## {{{
+# Sources necessary to build the linetest program (rxuart-txuart test)
+LINSRCS := linetest.cpp uartsim.cpp
+LINOBJ := $(subst .cpp,.o,$(LINSRCS))
+LINOBJS:= $(addprefix $(OBJDIR)/,$(LINOBJ)) $(VLIB)
 linetest: $(LINOBJS) $(VOBJDR)/Vlinetest__ALL.a
 	$(CXX) $(FLAGS) $(INCS) $^ -o $@
+## }}}
 
+## linetestlite
+## {{{
+$(OBJDIR)/linetestlite.o: linetest.cpp
+	$(mk-objdir)
+	$(CXX) $(FLAGS) $(INCS) -DUSE_UART_LITE -c $< -o $@
+
+
+LINLTSRCS := linetest.cpp uartsim.cpp
+LINLTOBJ := linetestlite.o uartsim.o
+LINLTOBJS:= $(addprefix $(OBJDIR)/,$(LINLTOBJ)) $(VLIB)
+linetestlite: $(LINLTOBJS) $(VOBJDR)/Vlinetestlite__ALL.a
+	$(CXX) $(FLAGS) $(INCS) $^ -o $@
+## }}}
+
+## Hello World
+## {{{
+# Sources necessary to build the helloworld test (txuart test)
+HLOSRCS := helloworld.cpp uartsim.cpp
+HLOOBJ := $(subst .cpp,.o,$(HLOSRCS))
+HLOOBJS:= $(addprefix $(OBJDIR)/,$(HLOOBJ)) $(VLIB)
 helloworld: $(HLOOBJS) $(VOBJDR)/Vhelloworld__ALL.a
 	$(CXX) $(FLAGS) $(INCS) $^ -o $@
+## }}}
+
+## helloworldlite
+## {{{
+$(OBJDIR)/helloworldlite.o: helloworld.cpp
+	$(mk-objdir)
+	$(CXX) $(FLAGS) $(INCS) -DUSE_UART_LITE -c $< -o $@
+
+HLOLTOBJ := helloworldlite.o uartsim.o
+HLOLTOBJS:= $(addprefix $(OBJDIR)/,$(HLOLTOBJ)) $(VLIB)
+helloworldlite: $(HLOLTOBJS) $(VOBJDR)/Vhelloworldlite__ALL.a
+	$(CXX) $(FLAGS) $(INCS) $^ -o $@
+## }}}
 
 #
 # The speech test program depends upon a copy of the Gettysburg Address,
@@ -130,15 +159,41 @@ speech.hex: mkspeech speech.txt
 	./mkspeech speech.txt
 	bash -c "if [ -d ../verilog/ ]; then cp speech.hex ../verilog/; fi"
 
+## speechtest
+## {{{
 # Now, if the speech.hex file is available, then we can perform our final build.
 # Actually, we could've done this without the speech file being available, but
 # this works.
+# Sources necessary to build the speech test (wbuart test)
+SPCHSRCS:= speechtest.cpp uartsim.cpp
+SPCHOBJ := $(subst .cpp,.o,$(SPCHSRCS))
+SPCHOBJS:= $(addprefix $(OBJDIR)/,$(SPCHOBJ)) $(VLIB)
 speechtest: speech.hex $(SPCHOBJS) $(VOBJDR)/Vspeechfifo__ALL.a 
 	$(CXX) $(FLAGS) $(INCS) $(SPCHOBJS) $(VOBJDR)/Vspeechfifo__ALL.a -o $@
+## }}}
 
-test: linetest speechtest
+## speechtestlite
+## {{{
+$(OBJDIR)/speechtestlite.o: speechtest.cpp
+	$(mk-objdir)
+	$(CXX) $(FLAGS) $(INCS) -DUSE_UART_LITE -c $< -o $@
+
+SPCHLTOBJ := speechtestlite.o uartsim.o
+SPCHLTOBJS:= $(addprefix $(OBJDIR)/,$(SPCHLTOBJ)) $(VLIB)
+speechtestlite: speech.hex $(SPCHLTOBJS) $(VOBJDR)/Vspeechfifolite__ALL.a 
+	$(CXX) $(FLAGS) $(INCS) $(SPCHLTOBJS) $(VOBJDR)/Vspeechfifolite__ALL.a -o $@
+## }}}
+
+## test
+## {{{
+test: linetest linetestlite helloworld helloworldlite speechtest speechtestlite
 	./linetest
+	./linetestlite
+	./helloworld
+	./helloworldlite
 	./speechtest
+	./speechtestlite
+## }}}
 
 #
 # The "depends" target, to know what files things depend upon.  The depends

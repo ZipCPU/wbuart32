@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	skidbuffer.v
-//
+// {{{
 // Project:	wbuart32, a full featured UART with simulator
 //
 // Purpose:	A basic SKID buffer.
@@ -55,9 +55,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2019-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -81,28 +81,32 @@
 //
 //
 `default_nettype none
-//
-module skidbuffer(i_clk, i_reset,
-		i_valid, o_ready, i_data,
-		o_valid, i_ready, o_data);
-	parameter	[0:0]	OPT_LOWPOWER = 0;
-	parameter	[0:0]	OPT_OUTREG = 1;
-	//
-	parameter	[0:0]	OPT_PASSTHROUGH = 0;
-	parameter		DW = 8;
-	input	wire			i_clk, i_reset;
-	input	wire			i_valid;
-	output	reg			o_ready;
-	input	wire	[DW-1:0]	i_data;
-	output	reg			o_valid;
-	input	wire			i_ready;
-	output	reg	[DW-1:0]	o_data;
+// }}}
+module skidbuffer #(
+		// {{{
+		parameter	[0:0]	OPT_LOWPOWER = 0,
+		parameter	[0:0]	OPT_OUTREG = 1,
+		//
+		parameter	[0:0]	OPT_PASSTHROUGH = 0,
+		parameter		DW = 8
+		// }}}
+	) (
+		// {{{
+		input	wire			i_clk, i_reset,
+		input	wire			i_valid,
+		output	reg			o_ready,
+		input	wire	[DW-1:0]	i_data,
+		output	reg			o_valid,
+		input	wire			i_ready,
+		output	reg	[DW-1:0]	o_data
+		// }}}
+	);
 
 	reg	[DW-1:0]	r_data;
 
 	generate if (OPT_PASSTHROUGH)
-	begin
-
+	begin : PASSTHROUGH
+		// {{{
 		always @(*)
 			o_ready = i_ready;
 		always @(*)
@@ -115,12 +119,14 @@ module skidbuffer(i_clk, i_reset,
 
 		always @(*)
 			r_data = 0;
-	end else begin
-		//
+		// }}}
+	end else begin : LOGIC
 		// We'll start with skid buffer itself
-		//
+		// {{{
 		reg			r_valid;
 
+		// r_valid
+		// {{{
 		initial	r_valid = 0;
 		always @(posedge i_clk)
 		if (i_reset)
@@ -130,7 +136,10 @@ module skidbuffer(i_clk, i_reset,
 			r_valid <= 1;
 		else if (i_ready)
 			r_valid <= 0;
+		// }}}
 
+		// r_data
+		// {{{
 		initial	r_data = 0;
 		always @(posedge i_clk)
 		if (OPT_LOWPOWER && i_reset)
@@ -139,9 +148,13 @@ module skidbuffer(i_clk, i_reset,
 			r_data <= 0;
 		else if ((!OPT_LOWPOWER || !OPT_OUTREG || i_valid) && o_ready)
 			r_data <= i_data;
+		// }}}
 
+		// o_ready
+		// {{{
 		always @(*)
 			o_ready = !r_valid;
+		// }}}
 
 		//
 		// And then move on to the output port
@@ -151,7 +164,10 @@ module skidbuffer(i_clk, i_reset,
 
 			always @(*)
 				o_valid = !i_reset && (i_valid || r_valid);
+			// }}}
 
+			// o_data
+			// {{{
 			always @(*)
 			if (r_valid)
 				o_data = r_data;
@@ -159,15 +175,23 @@ module skidbuffer(i_clk, i_reset,
 				o_data = i_data;
 			else
 				o_data = 0;
-		end else begin
-
+			// }}}
+			// }}}
+		end else begin : REG_OUTPUT
+			// Register our outputs
+			// {{{
+			// o_valid
+			// {{{
 			initial	o_valid = 0;
 			always @(posedge i_clk)
 			if (i_reset)
 				o_valid <= 0;
 			else if (!o_valid || i_ready)
 				o_valid <= (i_valid || r_valid);
+			// }}}
 
+			// o_data
+			// {{{
 			initial	o_data = 0;
 			always @(posedge i_clk)
 			if (OPT_LOWPOWER && i_reset)
@@ -182,8 +206,11 @@ module skidbuffer(i_clk, i_reset,
 				else
 					o_data <= 0;
 			end
-		end
+			// }}}
 
+			// }}}
+		end
+		// }}}
 	end endgenerate
 
 `ifdef	FORMAL

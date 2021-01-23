@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	uartsim.cpp
-//
+// {{{
 // Project:	wbuart32, a full featured UART with simulator
 //
 // Purpose:	To forward a Verilator simulated UART link over a TCP/IP pipe.
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,14 +27,15 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,6 +49,8 @@
 
 #include "uartsim.h"
 
+// setup_listener
+// {{{
 void	UARTSIM::setup_listener(const int port) {
 	struct	sockaddr_in	my_addr;
 
@@ -88,7 +91,10 @@ void	UARTSIM::setup_listener(const int port) {
 		exit(EXIT_FAILURE);
 	}
 }
+// }}}
 
+// UARTSIM::UARTSIM(const int port)
+// {{{
 UARTSIM::UARTSIM(const int port) {
 	m_conrd = m_conwr = m_skt = -1;
 	if (port == 0) {
@@ -102,7 +108,10 @@ UARTSIM::UARTSIM(const int port) {
 	m_rx_state = RXIDLE;
 	m_tx_state = TXIDLE;
 }
+// }}}
 
+// UARTSIM::kill
+// {{{
 void	UARTSIM::kill(void) {
 	fflush(stdout);
 
@@ -118,7 +127,10 @@ void	UARTSIM::kill(void) {
 
 	m_conrd = m_conwr = m_skt = -1;
 }
+// }}}
 
+// UARTSIM::setup(isetup)
+// {{{
 void	UARTSIM::setup(unsigned isetup) {
 	if (isetup != m_setup) {
 		m_setup = isetup;
@@ -130,7 +142,10 @@ void	UARTSIM::setup(unsigned isetup) {
 		m_evenp   = (isetup >> 24)&1;
 	}
 }
+// }}}
 
+// UARTSIM::check_for_new_connections
+// {{{
 void	UARTSIM::check_for_new_connections(void) {
 	if ((m_conrd < 0)&&(m_conwr<0)&&(m_skt>=0)) {
 		// Can we accept a connection?
@@ -151,7 +166,10 @@ void	UARTSIM::check_for_new_connections(void) {
 	}
 
 }
+// }}}
 
+// UARTSIM::rawtick(i_tx, network)
+// {{{
 int	UARTSIM::rawtick(const int i_tx, const bool network) {
 	int	o_rx = 1, nr = 0;
 
@@ -275,11 +293,18 @@ int	UARTSIM::rawtick(const int i_tx, const bool network) {
 
 	return o_rx;
 }
+// }}}
 
+// UARTSIM::nettick
+// {{{
 int	UARTSIM::nettick(const int i_tx) {
 	return rawtick(i_tx, true);
 }
+// }}}
 
+// UARTSIM::fdtick
+// {{{
 int	UARTSIM::fdtick(const int i_tx) {
 	return rawtick(i_tx, false);
 }
+// }}}

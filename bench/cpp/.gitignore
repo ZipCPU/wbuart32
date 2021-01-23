@@ -1,6 +1,9 @@
 mkspeech
 helloworld
+helloworldlite
 linetest
+linetestlite
 speechtest
+speechtestlite
 *.vcd
 obj-pc/*

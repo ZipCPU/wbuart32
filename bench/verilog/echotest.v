@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	echotest.v
-//
+// {{{
 // Project:	wbuart32, a full featured UART with simulator
 //
 // Purpose:	To test that the txuart and rxuart modules work properly, by
@@ -26,9 +26,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -53,9 +53,9 @@
 //
 // Uncomment the next line defining OPT_DUMBECHO in order to test the wires
 // and external functionality of any UART, independent of the UART protocol.
-//
+// }}}
 `define	OPT_DUMBECHO
-//
+// {{{
 //
 // One issue with the design is how to set the values of the setup register.
 // (*This is a comment, not a verilator attribute ... )  Verilator needs to
@@ -65,40 +65,42 @@
 // OPT_STANDALONE to distinguish between the two.  If set, the file runs under
 // (* Another comment still ...) Verilator and we need to get i_setup from the
 // external environment.  If not, it must be set internally.
-//
+// }}}
 `ifndef	VERILATOR
 `define OPT_STANDALONE
 `endif
-//
+// {{{
 //
 // Two versions of the UART can be found in the rtl directory: a full featured
 // UART, and a LITE UART that only handles 8N1 -- no break sending, break
 // detection, parity error detection, etc.  If we set USE_LITE_UART here, those
 // simplified UART modules will be used.
-//
+// }}}
 // `define	USE_LITE_UART
 //
 //
-module	echotest(i_clk,
+module	echotest(
+		// {{{
+		input		i_clk,
 `ifndef	OPT_STANDALONE
-			i_setup,
+		input	[30:0]	i_setup,
 `endif
-			i_uart_rx, o_uart_tx);
-	input		i_clk;
-`ifndef	OPT_STANDALONE
-	input	[30:0]	i_setup;
-`endif
-	input		i_uart_rx;
-	output	wire	o_uart_tx;
+		input		i_uart_rx,
+		output	wire	o_uart_tx
+		// }}}
+	);
 
 `ifdef	OPT_DUMBECHO
+	// {{{
 	reg	r_uart_tx;
 
 	initial	r_uart_tx = 1'b1;
 	always @(posedge i_clk)
 		r_uart_tx <= i_uart_rx;
 	assign	o_uart_tx = r_uart_tx;
+	// }}}
 `else
+	// {{{
 	// This is the "smart" echo verion--one that decodes, and then
 	// re-encodes, values over the UART.  There is a risk, though, doing
 	// things in this manner that the receive UART might run *just* a touch
@@ -107,7 +109,8 @@ module	echotest(i_clk,
 	// for high-speed UART testing.
 
 
-
+	// i_setup
+	// {{{
 	// If i_setup isnt set up as an input parameter, it needs to be set.
 	// We do so here, to a setting appropriate to create a 115200 Baud
 	// comms system from a 100MHz clock.  This also sets us to an 8-bit
@@ -118,17 +121,19 @@ module	echotest(i_clk,
 	wire	[30:0]	i_setup;
 	assign		i_setup = 31'd868;	// 115200 Baud, if clk @ 100MHz
 `endif
+	// }}}
 
+	// pwr_reset
+	// {{{
 	// Create a reset line that will always be true on a power on reset
 	reg	pwr_reset;
 	initial	pwr_reset = 1'b1;
 	always @(posedge i_clk)
 		pwr_reset = 1'b0;
-
-
+	// }}}
 
 	// The UART Receiver
-	//
+	// {{{
 	// This is where everything begins, by reading data from the UART.
 	//
 	// Data (rx_data) is present when rx_stb is true.  Any parity or
@@ -150,7 +155,10 @@ module	echotest(i_clk,
 	rxuart	receiver(i_clk, pwr_reset, i_setup, i_uart_rx, rx_stb, rx_data,
 			rx_break, rx_perr, rx_ferr, rx_ignored);
 `endif
+	// }}}
 
+	// The UART return transmitter
+	// {{{
 	// Bypass any transmit hardware flow control.
 	wire	cts_n;
 	assign cts_n = 1'b0;
@@ -167,8 +175,8 @@ module	echotest(i_clk,
 	txuart	transmitter(i_clk, pwr_reset, i_setup, rx_break,
 			rx_stb, rx_data, rts, o_uart_tx, tx_busy);
 `endif
-
-`endif
-
+	// }}}
+	// }}}
+`endif	// OPT_DUMBECHO
 endmodule
 

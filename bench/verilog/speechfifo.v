@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	speechfifo.v
-//
+// {{{
 // Project:	wbuart32, a full featured UART with simulator
 //
 // Purpose:	To test/demonstrate/prove the wishbone access to the FIFO'd
@@ -20,9 +20,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -57,35 +57,33 @@
 `ifndef	VERILATOR
 `define OPT_STANDALONE
 `endif
-//
-module	speechfifo(i_clk,
+// }}}
+module	speechfifo #(
+		// {{{
+		// Here we set i_setup to something appropriate to create a
+		// 115200 Baud UART system from a 100MHz clock.  This also sets
+		// us to an 8-bit data word, 1-stop bit, and no parity (for the
+		// non-LITE UART).  This will be overwritten by i_setup (if
+		// present), but at least it gives us something to start
+		// with/from.
+		parameter	INITIAL_UART_SETUP = 31'd868,
+
+		// Let's set our message length, in case we ever wish to change
+		// it in the future
+		localparam	MSGLEN=2203
+		// }}}
+	) (
+		// {{{
+		input	wire		i_clk,
 `ifndef	OPT_STANDALONE
-			i_setup,
+		input	wire	[30:0]	i_setup,
 `endif
-			o_uart_tx);
-	input		i_clk;
-	output	wire	o_uart_tx;
+		output	wire		o_uart_tx
+		// }}}
+	);
 
-	// Here we set i_setup to something appropriate to create a 115200 Baud
-	// UART system from a 100MHz clock.  This also sets us to an 8-bit data
-	// word, 1-stop bit, and no parity.  This will be overwritten by
-	// i_setup, but at least it gives us something to start with/from.
-	parameter	INITIAL_UART_SETUP = 31'd868;
-
-	// Let's set our message length, in case we ever wish to change it in
-	// the future
-	localparam	MSGLEN=2203;
-
-	// The i_setup wires are input when run under Verilator, but need to
-	// be set internally if this is going to run as a standalone top level
-	// test configuration.
-`ifdef	OPT_STANDALONE
-	wire	[30:0]	i_setup;
-	assign	i_setup = INITIAL_UART_SETUP;
-`else
-	input	[30:0]	i_setup;
-`endif
-
+	// Signal declarations
+	// {{{
 	reg		restart;
 	reg		wb_stb;
 	reg	[1:0]	wb_addr;
@@ -103,18 +101,39 @@ module	speechfifo(i_clk,
 	wire		rts_n_ignored;
 	/* verilator lint_on UNUSED */
 
-	/* verilator lint_on UNUSED */
+	reg		pwr_reset;
+	reg	[7:0]	message [0:4095];
+	reg	[30:0]	restart_counter;
+	reg	[11:0]	msg_index;
+	reg		end_of_message;
 
+	wire	cts_n;
 	wire		txfifo_int;
+	// }}}
 
+	// i_setup
+	// {{{
+	// The i_setup wires are input when run under Verilator, but need to
+	// be set internally if this is going to run as a standalone top level
+	// test configuration.
+`ifdef	OPT_STANDALONE
+	wire	[30:0]	i_setup;
+	assign	i_setup = INITIAL_UART_SETUP;
+`endif
+	// }}}
+
+	// pwr_reset
+	// {{{
 	// The next four lines create a strobe signal that is true on the first
 	// clock, but never after.  This makes for a decent power-on reset
 	// signal.
-	reg	pwr_reset;
 	initial	pwr_reset = 1'b1;
 	always @(posedge i_clk)
 		pwr_reset <= 1'b0;
+	// }}}
 
+	// initializing the memory
+	// {{{
 	// The message we wish to transmit is kept in "message".  It needs to be
 	// set initially.  Do so here.
 	//
@@ -122,7 +141,6 @@ module	speechfifo(i_clk,
 	// element to a space so that if (for some reason) we broadcast past the
 	// end of our message, we'll at least be sending something useful.
 	integer	i;
-	reg	[7:0]	message [0:4095];
 	initial begin
 		// xx Verilator needs this file to be in the directory the file
 		// is run from.  For that reason, the project builds, makes,
@@ -156,18 +174,24 @@ module	speechfifo(i_clk,
 		//
 		// `include "speech.inc"
 	end
+	// }}}
 
+	// restart_counter
+	// {{{
 	// Let's keep track of time, and send our message over and over again.
 	// To do this, we'll keep track of a restart counter.  When this counter
 	// rolls over, we restart our message.
-	reg	[30:0]	restart_counter;
+	//
 	// Since we want to start our message just a couple clocks after power
 	// up, we'll set the reset counter just a couple clocks shy of a roll
 	// over.
 	initial	restart_counter = -31'd16;
 	always @(posedge i_clk)
 		restart_counter <= restart_counter+1'b1;
+	// }}}
 
+	// restart
+	// {{{
 	// Ok, now that we have a counter that tells us when to start over,
 	// let's build a set of signals that we can use to get things started
 	// again.  This will be the restart signal.  On this signal, we just
@@ -175,54 +199,62 @@ module	speechfifo(i_clk,
 	initial	restart = 0;
 	always @(posedge i_clk)
 		restart <= (restart_counter == 0);
+	// }}}
 
+	// msg_index
+	// {{{
 	// Our message index.  This is the address of the character we wish to
 	// transmit next.  Note, there's a clock delay between setting this 
 	// index and when the wb_data is valid.  Hence, we set the index on
 	// restart[0] to zero.
-	reg	[11:0]	msg_index;
 	initial	msg_index = 12'h000 - 12'h8;
 	always @(posedge i_clk)
-	begin
-		if (restart)
-			msg_index <= 0;
-		else if ((wb_stb)&&(!uart_stall))
-			// We only advance the index if a port operation on the
-			// wbuart has taken place.  That's what the
-			// (wb_stb)&&(!uart_stall) is about.  (wb_stb) is the
-			// request for a transaction on the bus, uart_stall
-			// tells us to wait 'cause the peripheral isn't ready. 
-			// In our case, it's always ready, uart_stall == 0, but
-			// we keep/maintain this logic for good form.
-			//
-			// Note also, we only advance when restart[0] is zero.
-			// This keeps us from advancing prior to the setup
-			// word.
-			msg_index <= msg_index + 1'b1;
-	end
+	if (restart)
+		msg_index <= 0;
+	else if ((wb_stb)&&(!uart_stall))
+		// We only advance the index if a port operation on the
+		// wbuart has taken place.  That's what the
+		// (wb_stb)&&(!uart_stall) is about.  (wb_stb) is the
+		// request for a transaction on the bus, uart_stall
+		// tells us to wait 'cause the peripheral isn't ready. 
+		// In our case, it's always ready, uart_stall == 0, but
+		// we keep/maintain this logic for good form.
+		//
+		// Note also, we only advance when restart[0] is zero.
+		// This keeps us from advancing prior to the setup
+		// word.
+		msg_index <= msg_index + 1'b1;
+	// }}}
 
-	// What data will we be sending to the port?
+	// wb_data -- What data will we be sending to the port?
+	// {{{
 	always @(posedge i_clk)
-		if (restart)
-			// The first thing we do is set the baud rate, and
-			// serial port configuration parameters.  Ideally,
-			// we'd only set this once.  But rather than complicate
-			// the logic, we set it everytime we start over.
-			wb_data <= { 1'b0, i_setup };
-		else if ((wb_stb)&&(!uart_stall))
-			// Then, if the last thing was received over the bus,
-			// we move to the next data item.
-			wb_data <= { 24'h00, message[msg_index] };
+	if (restart)
+		// The first thing we do is set the baud rate, and
+		// serial port configuration parameters.  Ideally,
+		// we'd only set this once.  But rather than complicate
+		// the logic, we set it everytime we start over.
+		wb_data <= { 1'b0, i_setup };
+	else if ((wb_stb)&&(!uart_stall))
+		// Then, if the last thing was received over the bus,
+		// we move to the next data item.
+		wb_data <= { 24'h00, message[msg_index] };
+	// }}}
 
+	// wb_addr
+	// {{{
 	// We send our first value to the SETUP address (all zeros), all other
 	// values we send to the transmitters address.  We should really be
 	// double checking that stall remains low, but its not required here.
 	always @(posedge i_clk)
-		if (restart)
-			wb_addr <= 2'b00;
-		else // if (!uart_stall)??
-			wb_addr <= 2'b11;
+	if (restart)
+		wb_addr <= 2'b00;
+	else // if (!uart_stall)??
+		wb_addr <= 2'b11;
+	// }}}
 
+	// end_of_message
+	// {{{
 	// Knowing when to stop sending the speech is important, but depends
 	// upon an 11 bit comparison.  Since FPGA logic is best measured by the
 	// number of inputs to an always block, we pull those 11-bits out of
@@ -230,14 +262,16 @@ module	speechfifo(i_clk,
 	// If end_of_message is true, then we need to stop transmitting, and
 	// wait for the next (restart) to get us started again.  We set that
 	// flag hee.
-	reg	end_of_message;
 	initial	end_of_message = 1'b1;
 	always @(posedge i_clk)
-		if (restart)
-			end_of_message <= 1'b0;
-		else
-			end_of_message <= (msg_index >= MSGLEN);
+	if (restart)
+		end_of_message <= 1'b0;
+	else
+		end_of_message <= (msg_index >= MSGLEN);
+	// }}}
 
+	// wb_stb
+	// {{{
 	// The wb_stb signal indicates that we wish to write, using the wishbone
 	// to our peripheral.  We have two separate types of writes.  First,
 	// we wish to write our setup.  Then we want to drop STB and write
@@ -246,24 +280,27 @@ module	speechfifo(i_clk,
 	// again.
 	initial	wb_stb = 1'b0;
 	always @(posedge i_clk)
-		if (restart)
-			// Start sending to the UART on a reset.  The first
-			// thing we'll send will be the configuration, but
-			// that's done elsewhere.  This just starts up the
-			// writes to the peripheral wbuart.
-			wb_stb <= 1'b1;
-		else if (end_of_message)
-			// Stop transmitting when we get to the end of our
-			// message.
-			wb_stb <= 1'b0;
-		else if (txfifo_int)
-			// If the FIFO is less than half full, then write to
-			// it.
-			wb_stb <= 1'b1;
-		else
-			// But once the FIFO gets to half full, stop.
-			wb_stb <= 1'b0;
+	if (restart)
+		// Start sending to the UART on a reset.  The first
+		// thing we'll send will be the configuration, but
+		// that's done elsewhere.  This just starts up the
+		// writes to the peripheral wbuart.
+		wb_stb <= 1'b1;
+	else if (end_of_message)
+		// Stop transmitting when we get to the end of our
+		// message.
+		wb_stb <= 1'b0;
+	else if (txfifo_int)
+		// If the FIFO is less than half full, then write to
+		// it.
+		wb_stb <= 1'b1;
+	else
+		// But once the FIFO gets to half full, stop.
+		wb_stb <= 1'b0;
+	// }}}
 
+	// cts_n
+	// {{{
 	// The WBUART can handle hardware flow control signals.  This test,
 	// however, cannot.  The reason?  Simply just to keep things simple.
 	// If you want to add hardware flow control to your design, simply
@@ -271,17 +308,17 @@ module	speechfifo(i_clk,
 	//
 	// Since this is an output only module demonstrator, what would be the
 	// cts output is unused.
-	wire	cts_n;
 	assign	cts_n = 1'b0;
+	// }}}
 
 	// Finally--the unit under test--now that we've set up all the wires
 	// to run/test it.
 	wbuart	#(INITIAL_UART_SETUP)
-		wbuarti(i_clk, pwr_reset,
-			wb_stb, wb_stb, 1'b1, wb_addr, wb_data, 4'hf,
-			uart_stall, uart_ack, uart_data,
-			1'b1, o_uart_tx, cts_n, rts_n_ignored,
-			ignored_rx_int, tx_int,
-			ignored_rxfifo_int, txfifo_int);
+	wbuarti(i_clk, pwr_reset,
+		wb_stb, wb_stb, 1'b1, wb_addr, wb_data, 4'hf,
+		uart_stall, uart_ack, uart_data,
+		1'b1, o_uart_tx, cts_n, rts_n_ignored,
+		ignored_rx_int, tx_int,
+		ignored_rxfifo_int, txfifo_int);
 
 endmodule

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	ufifo.v
-//
+// {{{
 // Project:	wbuart32, a full featured UART with simulator
 //
 // Purpose:	A synchronous data FIFO, designed for supporting the Wishbone
@@ -17,9 +17,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -34,8 +34,9 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
@@ -43,22 +44,29 @@
 //
 //
 `default_nettype	none
-//
-module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_err);
-	parameter	BW=8;	// Byte/data width
-	parameter [3:0]	LGFLEN=4;
-	parameter [0:0]	RXFIFO=1'b1;
-	input	wire		i_clk, i_reset;
-	input	wire		i_wr;
-	input	wire [(BW-1):0]	i_data;
-	output	wire		o_empty_n;	// True if something is in FIFO
-	input	wire		i_rd;
-	output	wire [(BW-1):0]	o_data;
-	output	wire	[15:0]	o_status;
-	output	wire		o_err;
+// }}}
+module ufifo #(
+		// {{{
+		parameter	BW=8,	// Byte/data width
+		parameter [3:0]	LGFLEN=4,
+		parameter [0:0]	RXFIFO=1'b1,
+		localparam	FLEN=(1<<LGFLEN)
+		// }}}
+	) (
+		// {{{
+		input	wire		i_clk, i_reset,
+		input	wire		i_wr,
+		input	wire [(BW-1):0]	i_data,
+		output	wire		o_empty_n, // True if something is in FIFO
+		input	wire		i_rd,
+		output	wire [(BW-1):0]	o_data,
+		output	wire	[15:0]	o_status,
+		output	wire		o_err
+		// }}}
+	);
 
-	localparam	FLEN=(1<<LGFLEN);
-
+	// Signal declarations
+	// {{{
 	reg	[(BW-1):0]	fifo[0:(FLEN-1)];
 	reg	[(BW-1):0]	r_data, last_write;
 	reg	[(LGFLEN-1):0]	wr_addr, rd_addr, r_next;
@@ -71,6 +79,7 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 	wire	[3:0]		lglen;
 	wire			w_half_full;
 	reg	[9:0]		w_fill;
+	// }}}
 
 	assign	w_write = (i_wr && (!will_overflow || i_rd));
 	assign	w_read  = (i_rd && o_empty_n);
@@ -78,6 +87,16 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 	assign	w_waddr_plus_two = wr_addr + 2;
 	assign	w_waddr_plus_one = wr_addr + 1;
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Write half
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	// will_overflow
+	// {{{
 	initial	will_overflow = 1'b0;
 	always @(posedge i_clk)
 	if (i_reset)
@@ -88,21 +107,35 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 		will_overflow <= (will_overflow)||(w_waddr_plus_two == rd_addr);
 	else if (w_waddr_plus_one == rd_addr)
 		will_overflow <= 1'b1;
+	// }}}
 
-	// Write
-
+	// wr_addr
+	// {{{
 	initial	wr_addr = 0;
 	always @(posedge i_clk)
 	if (i_reset)
 		wr_addr <= { (LGFLEN){1'b0} };
 	else if (w_write)
 		wr_addr <= w_waddr_plus_one;
+	// }}}
 
+	// Write to the FIFO
+	// {{{
 	always @(posedge i_clk)
 	if (w_write) // Write our new value regardless--on overflow or not
 		fifo[wr_addr] <= i_data;
+	// }}}
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Read half
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
-	// Reads
+	// Notes
+	// {{{
 	//	Following a read, the next sample will be available on the
 	//	next clock
 	//	Clock	ReadCMD	ReadAddr	Output
@@ -114,7 +147,10 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 	//	5	1	2		fifo[2]
 	//	6	0	3		fifo[3]
 	//	7	0	3		fifo[3]
+	// }}}
 
+	// will_underflow
+	// {{{
 	initial	will_underflow = 1'b1;
 	always @(posedge i_clk)
 	if (i_reset)
@@ -123,8 +159,10 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 		will_underflow <= 1'b0;
 	else if (w_read)
 		will_underflow <= (will_underflow)||(r_next == wr_addr);
+	// }}}
 
-	//
+	// rd_addr, r_next
+	// {{{
 	// Don't report FIFO underflow errors.  These'll be caught elsewhere
 	// in the system, and the logic below makes it hard to reset them.
 	// We'll still report FIFO overflow, however.
@@ -141,15 +179,24 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 		rd_addr <= rd_addr + 1;
 		r_next  <= rd_addr + 2;
 	end
+	// }}}
 
+	// Read from the FIFO
+	// {{{
 	always @(posedge i_clk)
 	if (w_read)
 		r_data <= fifo[r_next[LGFLEN-1:0]];
+	// }}}
 
+	// last_write -- for bypassing the memory read
+	// {{{
 	always @(posedge i_clk)
 	if (i_wr && (!o_empty_n || (w_read && r_next == wr_addr)))
 		last_write <= i_data;
+	// }}}
 
+	// osrc
+	// {{{
 	initial	osrc = 1'b0;
 	always @(posedge i_clk)
 	if (i_reset)
@@ -158,10 +205,20 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 		osrc <= 1'b1;
 	else if (i_rd)
 		osrc <= 1'b0;
+	// }}}
 
 	assign o_data = (osrc) ? last_write : r_data;
-
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
+	// Status signals and flags
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	// r_fill
+	// {{{
 	// If this is a receive FIFO, the FIFO count that matters is the number
 	// of values yet to be read.  If instead this is a transmit FIFO, then
 	// the FIFO count that matters is the number of empty positions that
@@ -170,7 +227,7 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 	// Adjust for these differences here.
 	generate if (RXFIFO)
 	begin : RXFIFO_FILL
-		//
+		// {{{
 		// Calculate the number of elements in our FIFO
 		//
 		// Although used for receive, this is actually the more
@@ -186,9 +243,9 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 		2'b10:	r_fill <= r_fill + 1'b1;
 		default:  begin end
 		endcase
-
+		// }}}
 	end else begin : TXFIFO_FILL
-		//
+		// {{{
 		// Calculate the number of empty elements in our FIFO
 		//
 		// This is the number you could send to the FIFO
@@ -203,12 +260,17 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 		2'b10:	r_fill <= r_fill - 1'b1;
 		default:  begin end
 		endcase
-
+		// }}}
 	end endgenerate
+	// }}}
 
-	// Flag any overflows
+	// o_err -- Flag any overflows
+	// {{{
 	assign o_err = (i_wr && !w_write);
+	// }}}
 
+	// o_status
+	// {{{
 	assign lglen = LGFLEN;
 
 	always @(*)
@@ -240,13 +302,18 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 		// operation will be successful.
 		(RXFIFO!=0)?!will_underflow:!will_overflow
 	};
+	// }}}
 
 	assign	o_empty_n = !will_underflow;
-
+	// }}}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Formal property section
-//
+// {{{
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
 	reg	f_past_valid;
@@ -258,7 +325,7 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Pointer checks
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -292,22 +359,27 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 		assert(r_fill == f_fill);
 	else
 		assert(r_fill == (~f_fill));
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Twin write check
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
 `ifdef	UFIFO
+	// Declare two arbitrary addresses and data values
+	// {{{
 	(* anyconst *) reg [LGFLEN-1:0]	f_const_addr;
 	(* anyconst *) reg [BW-1:0]	f_const_data, f_const_second;
 	reg [LGFLEN-1:0]	f_next_addr;
 	reg	[1:0]		f_state;
 	reg			f_first_in_fifo, f_second_in_fifo;
 	reg	[LGFLEN-1:0]	f_distance_to_first, f_distance_to_second;
+	// }}}
 
+	// Determine if those data values are at their addresses in the FIFO
+	// {{{
 	always @(*)
 	begin
 		f_next_addr = f_const_addr + 1;
@@ -322,7 +394,10 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 			&& !will_underflow
 			&& (fifo[f_next_addr] == f_const_second);
 	end
+	// }}}
 
+	// Generate the twin-write state machine
+	// {{{
 	initial	f_state = 2'b00;
 	always @(posedge i_clk)
 	if (i_reset)
@@ -340,7 +415,10 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 	2'b11: if (w_read)
 			f_state <= 2'b00;
 	endcase
+	// }}}
 
+	// Check conditions against the twin write state machine
+	// {{{
 	always @(*)
 	case(f_state)
 	2'b00: begin end
@@ -363,11 +441,13 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 		assert(o_data  == f_const_second);
 		end
 	endcase
+	// }}}
 `endif
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Cover checks
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -376,6 +456,8 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 	always @(*)
 		cover(o_empty_n);
 
+	// Can't cover the FIFO being full when the FIFO is a member of another
+	// components--so we only check that we can be filled here
 `ifdef	UFIFO
 	always @(*)
 		cover(o_err);
@@ -390,5 +472,7 @@ module ufifo(i_clk, i_reset, i_wr, i_data, o_empty_n, i_rd, o_data, o_status, o_
 	always @(*)
 		cover(cvr_filled && !o_empty_n);
 `endif // UFIFO
+	// }}}
 `endif
+// }}}
 endmodule

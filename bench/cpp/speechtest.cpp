@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	speechtest.cpp
-//
+// {{{
 // Project:	wbuart32, a full featured UART with simulator
 //
 // Purpose:	To demonstrate a useful Verilog file which could be used as a
@@ -16,9 +16,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -33,14 +33,15 @@
 // with this program.  (It's in the $(ROOT)/doc directory, run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <verilatedos.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -51,11 +52,18 @@
 #include <signal.h>
 #include <ctype.h>
 #include "verilated.h"
+#ifdef	USE_UART_LITE
+#include "Vspeechfifolite.h"
+#define	SIMCLASS	Vspeechfifolite
+#else
 #include "Vspeechfifo.h"
+#define	SIMCLASS	Vspeechfifo
+#endif
 #include "uartsim.h"
 #include "verilated_vcd_c.h"
 
 void	usage(void) {
+// {{{
 	fprintf(stderr, "USAGE: speechtest [-i] [<matchfile>.txt]\n");
 	fprintf(stderr, "\n"
 "\tWhere ... \n"
@@ -68,16 +76,19 @@ void	usage(void) {
 "\t\tfile, the simulation will exit with success.  Only the number of\n"
 "\t\tcharacters in the match file will be tested.\n\n");
 };
+// }}}
 
 int	main(int argc, char **argv) {
 	Verilated::commandArgs(argc, argv);
-	Vspeechfifo	tb;
+	SIMCLASS	tb;
 	UARTSIM		*uart;
 	int		port = 0;
 	unsigned	setup = 25, testcount = 0, baudclocks;
 	const char	*matchfile = "speech.txt";
 	bool		run_interactively = false;
 
+	// Argument processing
+	// {{{
 	for(int argn=1; argn<argc; argn++) {
 		if (argv[argn][0]=='-') for(int j=1; (j<1000)&&(argv[argn][j]); j++)
 		switch(argv[argn][j]) {
@@ -91,12 +102,13 @@ int	main(int argc, char **argv) {
 			matchfile = argv[argn];
 		}
 	}
+	// }}}
 
 	tb.i_setup = setup;
 	baudclocks = setup & 0x0ffffff;
 
 	if (run_interactively) {
-		//
+		// {{{
 		// The difference between the non-interactive mode and the
 		// interactive mode is that in the interactive mode we don't
 		// get to observe the speech being output to stdout.  Thus,
@@ -168,9 +180,11 @@ int	main(int argc, char **argv) {
 		// why we stopped.
 		//
 		printf("\n\nSimulation complete\n");
+		// }}}
 	} else {
 		//
 		// Non-interactive mode is more difficult.  In this case, we
+		// {{{
 		// must figure out how to determine if the test was successful
 		// or not.  Since uartsim dumps the UART output to standard
 		// out, we then need to do a bit of work to capture that.
@@ -178,6 +192,10 @@ int	main(int argc, char **argv) {
 		// In particular, we are going to fork ourselves and set up our
 		// child process so that we can read from its standard out
 		// (and write to its standard in--although we don't).
+		// }}}
+
+		// Setup parent/child processes
+		// {{{
 		int	childs_stdin[2], childs_stdout[2];
 		FILE	*fp = fopen(matchfile, "r");
 		long	flen = 0;
@@ -237,16 +255,22 @@ int	main(int argc, char **argv) {
 			printf("FAIL\n");
 			exit(EXIT_FAILURE);
 		}
+		// }}}
 
-		if (child_pid) {
+		if (child_pid) { // We are the parent
+			// {{{
 			int	nr = -2, rd, fail;
 
-			// We are the parent
+			// Set up the parents file relationships
+			// {{{
 			// Adjust our pipe file descriptors so that they are
 			// useful.
 			close(childs_stdin[ 0]); // Close the read end
 			close(childs_stdout[1]); // Close the write end
+			// }}}
 
+			// Read the string to match against here
+			// {{{
 			// Let's allocate some buffers to contain both our
 			// match file (string), and what we read from the 
 			// UART.  Nominally, we would only need flen+1
@@ -284,8 +308,10 @@ int	main(int argc, char **argv) {
 				*dp++ = '\0';
 				flen = strlen(string);
 			}
+			// }}}
 
-			//
+			// Read from the sim and compare
+			// {{{
 			// Enough setup, let's do our work: Read a character
 			// from the pipe and compare it against what we are
 			// expecting.  Break out on any comparison failure.
@@ -306,7 +332,10 @@ int	main(int argc, char **argv) {
 				rdbuf[rd+nr] = 0;
 				nr += rd;
 			}
+			// }}}
 
+			// Kill the child and clean up
+			// {{{
 			// Tell the user how many (of how many) characters we
 			// compared (that matched), for debugging purposes.
 			//
@@ -317,8 +346,10 @@ int	main(int argc, char **argv) {
 
 			free(string);
 			free(rdbuf);
+			// }}}
 
 			// Report on the results, either PASS or FAIL
+			// {{{
 			if (nr == flen) {
 				printf("PASS\n");
 				exit(EXIT_SUCCESS);
@@ -329,10 +360,13 @@ int	main(int argc, char **argv) {
 			//
 			// At this point, the parent is complete, and can
 			// exit.
-		} else {
-			//
-			// If childs_pid == 0, then we are the child
-			//
+			// }}}
+			// }}}
+		} else { // If childs_pid == 0, then we are the child
+			// {{{
+
+			// Finish setting up the child's I/O
+			// {{{
 			// The child reports the uart result via stdout, so
 			// let's make certain it points to STDOUT_FILENO.
 			//
@@ -357,6 +391,7 @@ int	main(int argc, char **argv) {
 				perror("O/S ERR");
 				exit(EXIT_FAILURE);
 			}
+			// }}}
 
 			// Set the UARTSIM up to producing an output to the
 			// STDOUT, rather than a TCP/IP port
@@ -365,7 +400,8 @@ int	main(int argc, char **argv) {
 			// properly
 			uart->setup(tb.i_setup);
 
-			//
+			// Main simulation loop
+			// {{{
 			// Now ... we're finally ready to run our simulation.
 			//
 			// while(testcount < baudclocks * 16 * 2048)
@@ -381,7 +417,10 @@ int	main(int argc, char **argv) {
 				// o_uart_tx value
 				(*uart)(tb.o_uart_tx);
 			}
+			// }}}
 
+			// Fail if we ever get here
+			// {{{
 			// We will never get here.  If all goes well, we will be
 			// killed as soon as we produce the speech.txt file
 			// output--many clocks before this.
@@ -392,6 +431,8 @@ int	main(int argc, char **argv) {
 			fprintf(stderr, "Child was never killed, did it produce any output?\n");
 			fprintf(stderr, "FAIL\n");
 			exit(EXIT_FAILURE);
+			// }}}
+			// }}}
 		}
 	}
 }

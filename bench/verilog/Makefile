@@ -1,7 +1,7 @@
 ################################################################################
 ##
 ## Filename:	Makefile
-##
+## {{{
 ## Project:	wbuart32, a full featured UART with simulator
 ##
 ## Purpose:	To direct the Verilator build of the Verilog portion of the
@@ -44,9 +44,9 @@
 ##		Gisselquist Technology, LLC
 ##
 ################################################################################
-##
-## Copyright (C) 2015-2020, Gisselquist Technology, LLC
-##
+## }}}
+## Copyright (C) 2015-2021, Gisselquist Technology, LLC
+## {{{
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
 ## by the Free Software Foundation, either version 3 of the License, or (at
@@ -67,10 +67,11 @@
 ##
 ################################################################################
 ##
-##
 .PHONY: all
 .DELETE_ON_ERROR:
+## }}}
 all:	test tags
+## {{{
 YYMMDD=`date +%Y%m%d`
 CXX   := g++
 FBDIR := .
@@ -80,30 +81,61 @@ VERILATOR := verilator
 VFLAGS := -Wall --MMD --trace -y $(RTLDR) -cc
 
 .PHONY: test testline testhello speechfifo
-test: testline testhello speechfifo
-testline:   $(VDIRFB)/Vlinetest__ALL.a
-testhello:  $(VDIRFB)/Vhelloworld__ALL.a
-speechfifo: $(VDIRFB)/Vspeechfifo__ALL.a
+## }}}
+test: testline testlinelite testhello testhellolite speechfifo speechfifolite
+## Dependencies
+## {{{
+testline:       $(VDIRFB)/Vlinetest__ALL.a
+testlinelite:   $(VDIRFB)/Vlinetestlite__ALL.a
+testhello:      $(VDIRFB)/Vhelloworld__ALL.a
+testhellolite:  $(VDIRFB)/Vhelloworldlite__ALL.a
+speechfifo:     $(VDIRFB)/Vspeechfifo__ALL.a
+speechfifolite: $(VDIRFB)/Vspeechfifolite__ALL.a
 
-$(VDIRFB)/Vlinetest__ALL.a:   $(VDIRFB)/Vlinetest.cpp
-$(VDIRFB)/Vhelloworld__ALL.a: $(VDIRFB)/Vhelloworld.cpp
-$(VDIRFB)/Vspeechfifo__ALL.a: $(VDIRFB)/Vspeechfifo.cpp
+$(VDIRFB)/Vlinetest__ALL.a:       $(VDIRFB)/Vlinetest.cpp
+$(VDIRFB)/Vlinetestlite__ALL.a:   $(VDIRFB)/Vlinetestlite.cpp
+$(VDIRFB)/Vhelloworld__ALL.a:     $(VDIRFB)/Vhelloworld.cpp
+$(VDIRFB)/Vhelloworldlite__ALL.a: $(VDIRFB)/Vhelloworldlite.cpp
+$(VDIRFB)/Vspeechfifo__ALL.a:     $(VDIRFB)/Vspeechfifo.cpp
+$(VDIRFB)/Vspeechfifolite__ALL.a: $(VDIRFB)/Vspeechfifolite.cpp
+## }}}
 
-$(VDIRFB)/V%.mk:  $(VDIRFB)/%.h
-$(VDIRFB)/V%.h:   $(VDIRFB)/%.cpp
+## Verilate build instructions
+## {{{
+$(VDIRFB)/V%.mk:  $(VDIRFB)/V%.h
+$(VDIRFB)/V%.h:   $(VDIRFB)/V%.cpp
 $(VDIRFB)/V%.cpp: $(FBDIR)/%.v
 	$(VERILATOR) $(VFLAGS) $*.v
 
+$(VDIRFB)/Vlinetestlite.cpp: $(FBDIR)/linetest.v
+	$(VERILATOR) $(VFLAGS) -DUSE_UART_LITE --prefix Vlinetestlite linetest.v
+$(VDIRFB)/Vhelloworldlite.cpp: $(FBDIR)/helloworld.v
+	$(VERILATOR) $(VFLAGS) -DUSE_UART_LITE --prefix Vhelloworldlite helloworld.v
+$(VDIRFB)/Vspeechfifolite.cpp: $(FBDIR)/speechfifo.v
+	$(VERILATOR) $(VFLAGS) -DUSE_UART_LITE --prefix Vspeechfifolite speechfifo.v
+## }}}
+
+## Turn C++ to libraries
+## {{{
 $(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.cpp
 	cd $(VDIRFB); make -f V$*.mk
+## }}}
 
+## TAGS
+## {{{
 tags: $(wildcard *.v) $(wildcard $(RTLDR)/*.v)
 	ctags *.v $(RTLDR)/*.v
+## }}}
 
+## Clean
+## {{{
 .PHONY: clean
 clean:
 	rm -rf tags $(VDIRFB)/
+## }}}
 
+## Automatic dependency handling
+## {{{
 DEPS := $(wildcard $(VDIRFB)/*.d)
 
 ifneq ($(MAKECMDGOALS),clean)
@@ -111,3 +143,4 @@ ifneq ($(DEPS),)
 include $(DEPS)
 endif
 endif
+## }}}

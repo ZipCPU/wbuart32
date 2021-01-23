@@ -12,7 +12,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020, Gisselquist Technology, LLC
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
 // {{{
 //
 // This program is free software (firmware): you can redistribute it and/or
@@ -688,7 +688,7 @@ module	axiluart #(
 
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Verilator lint-check
+	// Veri1ator lint-check
 	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;

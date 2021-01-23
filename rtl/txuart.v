@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	txuart.v
-//
+// {{{
 // Project:	wbuart32, a full featured UART with simulator
 //
 // Purpose:	Transmit outputs over a single UART line.
@@ -68,9 +68,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -95,43 +95,48 @@
 //
 `default_nettype	none
 //
-//
-module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
-		i_cts_n, o_uart_tx, o_busy);
-	parameter	[30:0]	INITIAL_SETUP = 31'd868;
-	//
-	localparam 	[3:0]	TXU_BIT_ZERO  = 4'h0;
-	localparam 	[3:0]	TXU_BIT_ONE   = 4'h1;
-	localparam 	[3:0]	TXU_BIT_TWO   = 4'h2;
-	localparam 	[3:0]	TXU_BIT_THREE = 4'h3;
-	// localparam 	[3:0]	TXU_BIT_FOUR  = 4'h4;
-	// localparam 	[3:0]	TXU_BIT_FIVE  = 4'h5;
-	// localparam 	[3:0]	TXU_BIT_SIX   = 4'h6;
-	localparam 	[3:0]	TXU_BIT_SEVEN = 4'h7;
-	localparam 	[3:0]	TXU_PARITY    = 4'h8;
-	localparam 	[3:0]	TXU_STOP      = 4'h9;
-	localparam 	[3:0]	TXU_SECOND_STOP = 4'ha;
-	//
-	localparam 	[3:0]	TXU_BREAK     = 4'he;
-	localparam 	[3:0]	TXU_IDLE      = 4'hf;
-	//
-	//
-	input	wire		i_clk, i_reset;
-	input	wire	[30:0]	i_setup;
-	input	wire		i_break;
-	input	wire		i_wr;
-	input	wire	[7:0]	i_data;
-	// Hardware flow control Ready-To-Send bit.  Set this to one to use
-	// the core without flow control.  (A more appropriate name would be
-	// the Ready-To-Receive bit ...)
-	input	wire		i_cts_n;
-	// And the UART input line itself
-	output	reg		o_uart_tx;
-	// A line to tell others when we are ready to accept data.  If
-	// (i_wr)&&(!o_busy) is ever true, then the core has accepted a byte
-	// for transmission.
-	output	wire		o_busy;
+// }}}
+module txuart #(
+		// {{{
+		parameter	[30:0]	INITIAL_SETUP = 31'd868,
+		//
+		localparam 	[3:0]	TXU_BIT_ZERO  = 4'h0,
+		localparam 	[3:0]	TXU_BIT_ONE   = 4'h1,
+		localparam 	[3:0]	TXU_BIT_TWO   = 4'h2,
+		localparam 	[3:0]	TXU_BIT_THREE = 4'h3,
+		// localparam 	[3:0]	TXU_BIT_FOUR  = 4'h4,
+		// localparam 	[3:0]	TXU_BIT_FIVE  = 4'h5,
+		// localparam 	[3:0]	TXU_BIT_SIX   = 4'h6,
+		localparam 	[3:0]	TXU_BIT_SEVEN = 4'h7,
+		localparam 	[3:0]	TXU_PARITY    = 4'h8,
+		localparam 	[3:0]	TXU_STOP      = 4'h9,
+		localparam 	[3:0]	TXU_SECOND_STOP = 4'ha,
+		//
+		localparam 	[3:0]	TXU_BREAK     = 4'he,
+		localparam 	[3:0]	TXU_IDLE      = 4'hf
+		// }}}
+	) (
+		// {{{
+		input	wire		i_clk, i_reset,
+		input	wire	[30:0]	i_setup,
+		input	wire		i_break,
+		input	wire		i_wr,
+		input	wire	[7:0]	i_data,
+		// Hardware flow control Ready-To-Send bit.  Set this to one to
+		// use the core without flow control.  (A more appropriate name
+		// would be the Ready-To-Receive bit ...)
+		input	wire		i_cts_n,
+		// And the UART input line itself
+		output	reg		o_uart_tx,
+		// A line to tell others when we are ready to accept data.  If
+		// (i_wr)&&(!o_busy) is ever true, then the core has accepted a
+		// byte for transmission.
+		output	wire		o_busy
+		// }}}
+	);
 
+	// Signal declarations
+	// {{{
 	wire	[27:0]	clocks_per_baud, break_condition;
 	wire	[1:0]	i_data_bits, data_bits;
 	wire		use_parity, parity_odd, dblstop, fixd_parity,
@@ -153,14 +158,17 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	reg	[3:0]	state;
 	reg	[7:0]	lcl_data;
 	reg		calc_parity, r_busy, zero_baud_counter, last_state;
+	reg		q_cts_n, qq_cts_n, ck_cts;
+	// }}}
 
-
+	// CTS: ck_cts
+	// {{{
 	// First step ... handle any hardware flow control, if so enabled.
 	//
 	// Clock in the flow control data, two clocks to avoid metastability
 	// Default to using hardware flow control (uart_setup[30]==0 to use it).
 	// Set this high order bit off if you do not wish to use it.
-	reg	q_cts_n, qq_cts_n, ck_cts;
+	//
 	// While we might wish to give initial values to q_rts and ck_cts,
 	// 1) it's not required since the transmitter starts in a long wait
 	// state, and 2) doing so will prevent the synthesizer from optimizing
@@ -174,8 +182,10 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 		{ qq_cts_n, q_cts_n } <= { q_cts_n, i_cts_n };
 	always	@(posedge i_clk)
 		ck_cts <= (!qq_cts_n)||(!hw_flow_control);
+	// }}}
 
-	initial	o_uart_tx = 1'b1;
+	// r_busy, state
+	// {{{
 	initial	r_busy = 1'b1;
 	initial	state  = TXU_IDLE;
 	always @(posedge i_clk)
@@ -235,18 +245,19 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 			// out this last bit.
 		end
 	end 
+	// }}}
 
 	// o_busy
-	//
+	// {{{
 	// This is a wire, designed to be true is we are ever busy above.
 	// originally, this was going to be true if we were ever not in the
 	// idle state.  The logic has since become more complex, hence we have
 	// a register dedicated to this and just copy out that registers value.
 	assign	o_busy = (r_busy);
-
+	// }}}
 
 	// r_setup
-	//
+	// {{{
 	// Our setup register.  Accept changes between any pair of transmitted
 	// words.  The register itself has many fields to it.  These are
 	// broken out up top, and indicate what 1) our baud rate is, 2) our
@@ -256,9 +267,10 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	always @(posedge i_clk)
 	if (!o_busy)
 		r_setup <= i_setup;
+	// }}}
 
 	// lcl_data
-	//
+	// {{{
 	// This is our working copy of the i_data register which we use
 	// when transmitting.  It is only of interest during transmit, and is
 	// allowed to be whatever at any other time.  Hence, if r_busy isn't
@@ -272,9 +284,10 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 		lcl_data <= i_data;
 	else if (zero_baud_counter)
 		lcl_data <= { 1'b0, lcl_data[7:1] };
+	// }}}
 
 	// o_uart_tx
-	//
+	// {{{
 	// This is the final result/output desired of this core.  It's all
 	// centered about o_uart_tx.  This is what finally needs to follow
 	// the UART protocol.
@@ -288,6 +301,8 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	//		not the parity bit is fixed, then what it's fixed to,
 	//		or changing, and hence what it's calculated value is.
 	//	1'b1 at all other times (stop bits, idle, etc)
+
+	initial	o_uart_tx = 1'b1;
 	always @(posedge i_clk)
 	if (i_reset)
 		o_uart_tx <= 1'b1;
@@ -299,10 +314,10 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 		TXU_PARITY:	o_uart_tx <= calc_parity;
 		default:	o_uart_tx <= 1'b1;
 		endcase
-
+	// }}}
 
 	// calc_parity
-	//
+	// {{{
 	// Calculate the parity to be placed into the parity bit.  If the
 	// parity is fixed, then the parity bit is given by the fixed parity
 	// value (r_setup[24]).  Otherwise the parity is given by the GF2
@@ -321,9 +336,12 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 			calc_parity <= parity_odd;
 	end else if (!r_busy)
 		calc_parity <= parity_odd;
+	// }}}
 
-
+	// baud_counter, zero_baud_counter
+	// {{{
 	// All of the above logic is driven by the baud counter.  Bits must last
+	// {{{
 	// clocks_per_baud in length, and this baud counter is what we use to
 	// make certain of that.
 	//
@@ -363,6 +381,7 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	// The logic is a bit twisted here, in that it will only check for the
 	// above condition when zero_baud_counter is false--so as to make
 	// certain the STOP bit is complete.
+	// }}}
 	initial	zero_baud_counter = 1'b0;
 	initial	baud_counter = 28'h05;
 	always @(posedge i_clk)
@@ -393,24 +412,49 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 		else
 			baud_counter <= clocks_per_baud - 28'h01;
 	end
+	// }}}
 
+	// last_state
+	// {{{
 	initial	last_state = 1'b0;
 	always @(posedge i_clk)
 	if (dblstop)
 		last_state <= (state == TXU_SECOND_STOP);
 	else
 		last_state <= (state == TXU_STOP);
+	// }}}
 
+	// Make Verilator happy
+	// {{{
 	// Verilator lint_off UNUSED
-	wire	[2:0]	unused;
-	assign	unused = { i_parity_odd, data_bits };
+	wire	unused;
+	assign	unused = &{ 1'b0, i_parity_odd, data_bits };
 	// Verilator lint_on  UNUSED
-
+	// }}}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+// Formal properties
+// {{{
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
+	// Declarations
+	// {{{
 	reg		fsv_parity;
 	reg	[30:0]	fsv_setup;
 	reg	[7:0]	fsv_data;
 	reg		f_past_valid;
+	//
+	// Our various sequence data declarations
+	reg	[5:0]	f_five_seq;
+	reg	[6:0]	f_six_seq;
+	reg	[7:0]	f_seven_seq;
+	reg	[8:0]	f_eight_seq;
+	reg	[2:0]	f_stop_seq;	// parity bit, stop bit, double stop bit
+	// }}}
 
 	initial	f_past_valid = 1'b0;
 	always @(posedge  i_clk)
@@ -460,14 +504,6 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 		assert(baud_counter == $past(baud_counter)-1'b1);
 	end
 
-	//
-	// Our various sequence data declarations
-	reg	[5:0]	f_five_seq;
-	reg	[6:0]	f_six_seq;
-	reg	[7:0]	f_seven_seq;
-	reg	[8:0]	f_eight_seq;
-	reg	[2:0]	f_stop_seq;	// parity bit, stop bit, double stop bit
-
 
 	//
 	// One byte transmitted
@@ -478,8 +514,10 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Five bit data
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
 	initial	f_five_seq = 0;
 	always @(posedge i_clk)
@@ -554,12 +592,14 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	end
 	default: begin assert(0); end
 	endcase
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Six bit data
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
 	initial	f_six_seq = 0;
 	always @(posedge i_clk)
@@ -641,12 +681,15 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	end
 	default: begin if (f_past_valid) assert(0); end
 	endcase
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Seven bit data
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
 	initial	f_seven_seq = 0;
 	always @(posedge i_clk)
 	if ((i_reset)||(i_break))
@@ -734,12 +777,11 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	end
 	default: begin if (f_past_valid) assert(0); end
 	endcase
-
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Eight bit data
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	initial	f_eight_seq = 0;
 	always @(posedge i_clk)
@@ -834,25 +876,28 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 	end
 	default: begin if (f_past_valid) assert(0); end
 	endcase
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Combined properties for all of the data sequences
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
+	//
 	always @(posedge i_clk)
 	if (((|f_five_seq[5:0]) || (|f_six_seq[6:0]) || (|f_seven_seq[7:0])
 			|| (|f_eight_seq[8:0]))
 		&& ($past(zero_baud_counter)))
 		assert(baud_counter == { 4'h0, fsv_setup[23:0] }-1);
 
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// The stop sequence
+	// {{{
+	////////////////////////////////////////////////////////////////////////
 	//
 	// This consists of any parity bit, as well as one or two stop bits
-	////////////////////////////////////////////////////////////////////////
+	//
 	initial	f_stop_seq = 1'b0;
 	always @(posedge i_clk)
 	if ((i_reset)||(i_break))
@@ -934,13 +979,14 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 		2'b10: fsv_parity = (^fsv_data[5:0]) ^ fsv_setup[24];
 		2'b11: fsv_parity = (^fsv_data[4:0]) ^ fsv_setup[24];
 		endcase
-
+	// }}}
 	//////////////////////////////////////////////////////////////////////
 	//
 	// The break sequence
-	//
+	// {{{
 	//////////////////////////////////////////////////////////////////////
 	reg	[1:0]	f_break_seq;
+
 	initial	f_break_seq = 2'b00;
 	always @(posedge i_clk)
 	if (i_reset)
@@ -969,14 +1015,14 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 		assert(r_busy);
 		assert(o_uart_tx == 1'b0);
 	end
-
+	// }}}
 	//////////////////////////////////////////////////////////////////////
 	//
 	// Properties for use during induction if we are made a submodule of
 	// the rxuart
-	//
+	// {{{
 	//////////////////////////////////////////////////////////////////////
-
+	//
 	// Need enough bits for reset (24+4) plus enough bits for all of the
 	// various characters, 24+4, so 24+5 is a minimum of this counter
 	//
@@ -991,38 +1037,57 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 
 	always @(*)
 	if (f_five_seq[0]|f_six_seq[0]|f_seven_seq[0]|f_eight_seq[0])
+		// {{{
 		assert(f_counter == (fsv_setup[23:0] - baud_counter - 1));
+		// }}}
 	else if (f_five_seq[1]|f_six_seq[1]|f_seven_seq[1]|f_eight_seq[1])
+		// {{{
 		assert(f_counter == ({4'h0, fsv_setup[23:0], 1'b0} - baud_counter - 1));
+		// }}}
 	else if (f_five_seq[2]|f_six_seq[2]|f_seven_seq[2]|f_eight_seq[2])
+		// {{{
 		assert(f_counter == ({4'h0, fsv_setup[23:0], 1'b0}
 				+{5'h0, fsv_setup[23:0]}
 				- baud_counter - 1));
+		// }}}
 	else if (f_five_seq[3]|f_six_seq[3]|f_seven_seq[3]|f_eight_seq[3])
+		// {{{
 		assert(f_counter == ({3'h0, fsv_setup[23:0], 2'b0}
 				- baud_counter - 1));
+		// }}}
 	else if (f_five_seq[4]|f_six_seq[4]|f_seven_seq[4]|f_eight_seq[4])
+		// {{{
 		assert(f_counter == ({3'h0, fsv_setup[23:0], 2'b0}
 				+{5'h0, fsv_setup[23:0]}
 				- baud_counter - 1));
+		// }}}
 	else if (f_five_seq[5]|f_six_seq[5]|f_seven_seq[5]|f_eight_seq[5])
+		// {{{
 		assert(f_counter == ({3'h0, fsv_setup[23:0], 2'b0}
 				+{4'h0, fsv_setup[23:0], 1'b0}
 				- baud_counter - 1));
+		// }}}
 	else if (f_six_seq[6]|f_seven_seq[6]|f_eight_seq[6])
+		// {{{
 		assert(f_counter == ({3'h0, fsv_setup[23:0], 2'b0}
 				+{5'h0, fsv_setup[23:0]}
 				+{4'h0, fsv_setup[23:0], 1'b0}
 				- baud_counter - 1));
+		// }}}
 	else if (f_seven_seq[7]|f_eight_seq[7])
+		// {{{
 		assert(f_counter == ({2'h0, fsv_setup[23:0], 3'b0}	// 8
 				- baud_counter - 1));
+		// }}}
 	else if (f_eight_seq[8])
+		// {{{
 		assert(f_counter == ({2'h0, fsv_setup[23:0], 3'b0}	// 9
 				+{5'h0, fsv_setup[23:0]}
 				- baud_counter - 1));
+		// }}}
 	else if (f_stop_seq[0] || (!use_parity && f_stop_seq[1]))
 	begin
+		// {{{
 		// Parity bit, or first of two stop bits
 		case(data_bits)
 		2'b00: assert(f_counter == ({2'h0, fsv_setup[23:0], 3'b0}
@@ -1038,8 +1103,10 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 				+{4'h0, fsv_setup[23:0], 1'b0}
 				- baud_counter - 1));
 		endcase
+		// }}}
 	end else if (!use_parity && !dblstop  && f_stop_seq[2])
 	begin
+		// {{{
 		// No parity, single stop bit
 		// Different from the one above, since the last counter is has
 		// one fewer items within it
@@ -1057,8 +1124,10 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 				+{4'h0, fsv_setup[23:0], 1'b0}
 				- baud_counter - 2));
 		endcase
+		// }}}
 	end else if (f_stop_seq[1])
 	begin
+		// {{{
 		// Parity and the first of two stop bits
 		assert(dblstop && use_parity);
 		case(data_bits)
@@ -1075,8 +1144,10 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 		2'b11: assert(f_counter == ({2'h0, fsv_setup[23:0], 3'b0}
 				- baud_counter - 1));		// 8
 		endcase
+		// }}}
 	end else if ((dblstop ^ use_parity) && f_stop_seq[2])
 	begin
+		// {{{
 		// Parity and one stop bit
 		// assert(!dblstop && use_parity);
 		case(data_bits)
@@ -1093,8 +1164,10 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 		2'b11: assert(f_counter == ({2'h0, fsv_setup[23:0], 3'b0}
 				- baud_counter - 2));		// 8
 		endcase
+		// }}}
 	end else if (f_stop_seq[2])
 	begin
+		// {{{
 		assert(dblstop);
 		assert(use_parity);
 		// Parity and two stop bits
@@ -1113,9 +1186,10 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 				+{5'h0, fsv_setup[23:0]}	// 9
 				- baud_counter - 2));
 		endcase
+		// }}}
 	end
 `endif
-
+	// }}}
 	//////////////////////////////////////////////////////////////////////
 	//
 	// Other properties, not necessarily associated with any sequences
@@ -1134,5 +1208,6 @@ module txuart(i_clk, i_reset, i_setup, i_break, i_wr, i_data,
 		assert(fsv_setup[23:0] > 2);
 
 `endif	// FORMAL
+// }}}
 endmodule
 

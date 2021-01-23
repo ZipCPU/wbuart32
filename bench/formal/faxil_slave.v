@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	faxil_slave.v (Formal properties of an AXI lite slave)
-//
+// {{{
 // Project:	wbuart32, a full featured UART with simulator
 //
 // Purpose:
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2018-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2018-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -36,8 +36,9 @@
 //
 //
 `default_nettype	none
-//
+// }}}
 module faxil_slave #(
+	// {{{
 	parameter  C_AXI_DATA_WIDTH	= 32,// Fixed, width of the AXI R&W data
 	parameter  C_AXI_ADDR_WIDTH	= 28,// AXI Address width (log wordsize)
 	// F_OPT_XILINX, Certain Xilinx cores impose additional rules upon AXI
@@ -91,7 +92,9 @@ module faxil_slave #(
 	//
 	localparam DW			= C_AXI_DATA_WIDTH,
 	localparam AW			= C_AXI_ADDR_WIDTH
+	// }}}
 	) (
+	// {{{
 	input	wire			i_clk,	// System clock
 	input	wire			i_axi_reset_n,
 
@@ -129,6 +132,7 @@ module faxil_slave #(
 	output	reg	[(F_LGDEPTH-1):0]	f_axi_rd_outstanding,
 	output	reg	[(F_LGDEPTH-1):0]	f_axi_wr_outstanding,
 	output	reg	[(F_LGDEPTH-1):0]	f_axi_awr_outstanding
+	// }}}
 );
 
 	localparam	MAX_SLAVE_TIMEOUT = (F_AXI_MAXWAIT > F_AXI_MAXDELAY)
@@ -178,8 +182,9 @@ module faxil_slave #(
 	//
 	// Insist that the reset signal start out asserted (negative), and
 	// remain so for 16 clocks.
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
+	//
 	generate if (F_OPT_ASSUME_RESET)
 	begin : ASSUME_INITIAL_RESET
 		always @(*)
@@ -257,7 +262,7 @@ module faxil_slave #(
 			`SLAVE_ASSERT(!i_axi_rvalid);
 		end
 	end endgenerate
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -758,20 +763,24 @@ module faxil_slave #(
 	//
 	// AXI write response channel
 	//
-	always @(posedge i_clk)
-	if (!F_OPT_READ_ONLY)
-		// Make sure we can get a write acknowledgment
-		cover((i_axi_bvalid)&&(i_axi_bready));
+	generate if (!F_OPT_READ_ONLY)
+	begin
+		always @(posedge i_clk)
+			// Make sure we can get a write acknowledgment
+			cover((i_axi_bvalid)&&(i_axi_bready));
+	end endgenerate
 
 	//
 	// AXI read response channel
 	//
-	always @(posedge i_clk)
-	if (!F_OPT_WRITE_ONLY)
-		// Make sure we can get a response from the read channel
-		cover((i_axi_rvalid)&&(i_axi_rready));
+	generate if (!F_OPT_WRITE_ONLY)
+	begin
+		always @(posedge i_clk)
+			// Make sure we can get a response from the read channel
+			cover((i_axi_rvalid)&&(i_axi_rready));
+	end endgenerate
 
-	generate if (!F_OPT_WRITE_ONLY && F_OPT_COVER_BURST > 0)
+	generate if (!F_OPT_READ_ONLY && F_OPT_COVER_BURST > 0)
 	begin : COVER_WRITE_BURSTS
 
 		reg	[31:0]	cvr_writes;
@@ -789,7 +798,7 @@ module faxil_slave #(
 
 	end endgenerate
 
-	generate if (!F_OPT_READ_ONLY && F_OPT_COVER_BURST > 0)
+	generate if (!F_OPT_WRITE_ONLY && F_OPT_COVER_BURST > 0)
 	begin : COVER_READ_BURSTS
 
 		reg	[31:0]	cvr_reads;
