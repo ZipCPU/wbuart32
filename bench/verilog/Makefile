@@ -70,7 +70,7 @@
 .PHONY: all
 .DELETE_ON_ERROR:
 ## }}}
-all:	test tags
+all:	test
 ## {{{
 YYMMDD=`date +%Y%m%d`
 CXX   := g++
