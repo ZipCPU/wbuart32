@@ -80,10 +80,13 @@ INCS	:= -I$(RTLD)/obj_dir/ -I$(VROOT)/include
 SOURCES := helloworld.cpp linetest.cpp uartsim.cpp uartsim.h
 VOBJDR	:= $(RTLD)/obj_dir
 SYSVDR	:= $(VROOT)/include
-VSRC	:= verilated.cpp verilated_vcd_c.cpp
-VLIB	:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(VSRC)))
 ## }}}
 all:	$(OBJDIR)/ linetest linetestlite helloworld helloworldlite speechtest speechtestlite test
+
+# Verilator's generated Makefile sets VM_*
+-include $(VOBJDR)/Vlinetest_classes.mk
+VSRC	:= $(addsuffix .cpp, $(VM_GLOBAL_FAST) $(VM_GLOBAL_SLOW))
+VLIB	:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(VSRC)))
 
 $(OBJDIR)/uartsim.o: uartsim.cpp uartsim.h
 

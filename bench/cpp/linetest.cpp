@@ -67,7 +67,6 @@
 
 int	main(int argc, char **argv) {
 	Verilated::commandArgs(argc, argv);
-	SIMCLASS	tb;
 	UARTSIM		*uart;
 	bool		run_interactively = false;
 	int		port = 0;
@@ -96,14 +95,15 @@ int	main(int argc, char **argv) {
 	}
 	// }}}
 
-	// Setup the baud rate
-	// {{{
-	tb.i_setup = setup;
-	int baudclocks = setup & 0x0ffffff;
-	tb.i_uart_rx = 1;
-	// }}}
-
 	if (run_interactively) {
+		// Setup the model and baud rate
+		// {{{
+		SIMCLASS tb;
+		tb.i_setup = setup;
+		tb.i_uart_rx = 1;
+		// }}}
+
+
 		// {{{
 		uart = new UARTSIM(port);
 		uart->setup(tb.i_setup);
@@ -216,6 +216,14 @@ int	main(int argc, char **argv) {
 				perror("O/S ERR");
 				exit(EXIT_FAILURE);
 			}
+
+			// Setup the model and baud rate
+			// {{{
+			SIMCLASS tb;
+			tb.i_setup = setup;
+			int baudclocks = setup & 0x0ffffff;
+			tb.i_uart_rx = 1;
+			// }}}
 
 			// UARTSIM(0) uses stdin and stdout for its FD's
 			uart = new UARTSIM(0);
