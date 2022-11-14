@@ -15,7 +15,7 @@ smtbmc yices
 [script]
 prf: read -formal -DRXUARTLITE -D PHASE_TWO rxuartlite.v
 cvr: read -formal -DRXUARTLITE -D PHASE_TWO rxuartlite.v
-chparam -set CLOCKS_PER_BAUD 16 rxuartlite
+hierarchy -top rxuartlite -chparam CLOCKS_PER_BAUD 16
 prep -top rxuartlite
 # opt_merge -share_all
 

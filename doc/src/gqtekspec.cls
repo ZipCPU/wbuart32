@@ -1,6 +1,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%/
 %
-%  Copyright (C) 2015, Gisselquist Technology, LLC
+%  Copyright (C) 2022, Gisselquist Technology, LLC
 % 
 %  This template is free software: you can redistribute it and/or modify it
 %  under the terms of the GNU General Public License as published by the
@@ -21,7 +21,7 @@
 % 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % \NeedsTeXFormat{LaTeX2e}[1995/12/01]
-\ProvidesClass{gqtekspec}[2015/03/03 v0.1 -- Gisselquist Technology Specification]
+\ProvidesClass{gqtekspec}[2022/11/14 v0.1 -- Gisselquist Technology Specification]
 \typeout{by Dan Gisselquist}
 \LoadClassWithOptions{report}
 \usepackage{datetime}

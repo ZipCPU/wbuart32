@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// Copyright (C) 2015-2022, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -189,12 +189,19 @@ module	wbuart #(
 	// four status-type values: 1) is it non-empty, 2) is the FIFO over half
 	// full, 3) a 16-bit status register, containing info regarding how full
 	// the FIFO truly is, and 4) an error indicator.
-	ufifo	#(.LGFLEN(LCLLGFLEN), .RXFIFO(1))
-		rxfifo(i_clk, (i_reset)||(rx_break)||(rx_uart_reset),
-			rx_stb, rx_uart_data,
-			rx_empty_n,
-			rxf_wb_read, rxf_wb_data,
-			rxf_status, rx_fifo_err);
+	ufifo	#(
+		// {{{
+		.LGFLEN(LCLLGFLEN), .RXFIFO(1)
+		// }}}
+	) rxfifo(
+		// {{{
+		.i_clk(i_clk), .i_reset((i_reset)||(rx_break)||(rx_uart_reset)),
+		.i_wr(rx_stb), .i_data(rx_uart_data),
+		.o_empty_n(rx_empty_n),
+		.i_rd(rxf_wb_read), .o_data(rxf_wb_data),
+		.o_status(rxf_status), .o_err(rx_fifo_err)
+		// }}}
+	);
 	// }}}
 
 	assign	o_uart_rxfifo_int = rxf_status[1];
@@ -335,12 +342,19 @@ module	wbuart #(
 	// break.  We read from the FIFO any time the UART transmitter is idle.
 	// and ... we just set the values (above) for controlling writing into
 	// this.
-	ufifo	#(.LGFLEN(LGFLEN), .RXFIFO(0))
-		txfifo(i_clk, (tx_break)||(tx_uart_reset),
-			txf_wb_write, txf_wb_data,
-			tx_empty_n,
-			(!tx_busy)&&(tx_empty_n), tx_data,
-			txf_status, txf_err);
+	ufifo	#(
+		// {{{
+		.LGFLEN(LGFLEN), .RXFIFO(0)
+		// }}}
+	) txfifo(
+		// {{{
+		.i_clk(i_clk), .i_reset((tx_break)||(tx_uart_reset)),
+		.i_wr(txf_wb_write), .i_data(txf_wb_data),
+			.o_empty_n(tx_empty_n),
+		.i_rd((!tx_busy)&&(tx_empty_n)), .o_data(tx_data),
+			.o_status(txf_status), .o_err(txf_err)
+		// }}}
+	);
 	// }}}
 
 	// Transmit interrupts
@@ -382,7 +396,7 @@ module	wbuart #(
 `endif
 
 	// TX-Reset logic
-	// {{{{
+	// {{{
 	// This is nearly identical to the RX reset logic above.  Basically,
 	// any time someone writes to bit [12] the transmitter will go through
 	// a reset cycle.  Keep bit [12] low, and everything will proceed as
@@ -435,7 +449,7 @@ module	wbuart #(
 	// This port is different from reading from the receive port, since
 	// there are no side effects.  (Reading from the receive port advances
 	// the receive FIFO, here only writing to the transmit port advances the
-	// transmit FIFO--hence the read values are free for ... whatever.)  
+	// transmit FIFO--hence the read values are free for ... whatever.)
 	// We choose here to provide information about the transmit FIFO
 	// (txf_err, txf_half_full, txf_full_n), information about the current
 	// voltage on the line (o_uart_tx)--and even the voltage on the receive
@@ -459,7 +473,7 @@ module	wbuart #(
 	// wb_fifo_data
 	// {{{
 	// Each of the FIFO's returns a 16 bit status value.  This value tells
-	// us both how big the FIFO is, as well as how much of the FIFO is in 
+	// us both how big the FIFO is, as well as how much of the FIFO is in
 	// use.  Let's merge those two status words together into a word we
 	// can use when reading about the FIFO.
 	assign	wb_fifo_data = { txf_status, rxf_status };
@@ -468,7 +482,7 @@ module	wbuart #(
 	// r_wb_addr
 	// {{{
 	// You may recall from above that reads take two clocks.  Hence, we
-	// need to delay the address decoding for a clock until the data is 
+	// need to delay the address decoding for a clock until the data is
 	// ready.  We do that here.
 	always @(posedge i_clk)
 		r_wb_addr <= i_wb_addr;
@@ -478,14 +492,14 @@ module	wbuart #(
 	// {{{
 	initial	r_wb_ack = 1'b0;
 	always @(posedge i_clk) // We'll ACK in two clocks
-		r_wb_ack <= i_wb_stb;
+		r_wb_ack <= (!i_reset)&&(i_wb_stb);
 	// }}}
 
 	// o_wb_ack
 	// {{{
 	initial	o_wb_ack = 1'b0;
 	always @(posedge i_clk) // Okay, time to set the ACK
-		o_wb_ack <= i_wb_cyc && r_wb_ack;
+		o_wb_ack <= (!i_reset)&&(r_wb_ack)&&(i_wb_cyc);
 	// }}}
 
 	// o_wb_data
