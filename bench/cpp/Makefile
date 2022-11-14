@@ -105,21 +105,21 @@ LINSRCS := linetest.cpp uartsim.cpp
 LINOBJ := $(subst .cpp,.o,$(LINSRCS))
 LINOBJS:= $(addprefix $(OBJDIR)/,$(LINOBJ)) $(VLIB)
 linetest: $(LINOBJS) $(VOBJDR)/Vlinetest__ALL.a
-	$(CXX) $(FLAGS) $(INCS) $^ -o $@
+	$(CXX) $(FLAGS) $(INCS) $^ -lpthread -o $@
 ## }}}
 
 ## linetestlite
 ## {{{
 $(OBJDIR)/linetestlite.o: linetest.cpp
 	$(mk-objdir)
-	$(CXX) $(FLAGS) $(INCS) -DUSE_UART_LITE -c $< -o $@
+	$(CXX) $(FLAGS) $(INCS) -DUSE_UART_LITE -c $< -lpthread -o $@
 
 
 LINLTSRCS := linetest.cpp uartsim.cpp
 LINLTOBJ := linetestlite.o uartsim.o
 LINLTOBJS:= $(addprefix $(OBJDIR)/,$(LINLTOBJ)) $(VLIB)
 linetestlite: $(LINLTOBJS) $(VOBJDR)/Vlinetestlite__ALL.a
-	$(CXX) $(FLAGS) $(INCS) $^ -o $@
+	$(CXX) $(FLAGS) $(INCS) $^ -lpthread -o $@
 ## }}}
 
 ## Hello World
@@ -129,19 +129,19 @@ HLOSRCS := helloworld.cpp uartsim.cpp
 HLOOBJ := $(subst .cpp,.o,$(HLOSRCS))
 HLOOBJS:= $(addprefix $(OBJDIR)/,$(HLOOBJ)) $(VLIB)
 helloworld: $(HLOOBJS) $(VOBJDR)/Vhelloworld__ALL.a
-	$(CXX) $(FLAGS) $(INCS) $^ -o $@
+	$(CXX) $(FLAGS) $(INCS) $^ -lpthread -o $@
 ## }}}
 
 ## helloworldlite
 ## {{{
 $(OBJDIR)/helloworldlite.o: helloworld.cpp
 	$(mk-objdir)
-	$(CXX) $(FLAGS) $(INCS) -DUSE_UART_LITE -c $< -o $@
+	$(CXX) $(FLAGS) $(INCS) -DUSE_UART_LITE -c $< -lpthread -o $@
 
 HLOLTOBJ := helloworldlite.o uartsim.o
 HLOLTOBJS:= $(addprefix $(OBJDIR)/,$(HLOLTOBJ)) $(VLIB)
 helloworldlite: $(HLOLTOBJS) $(VOBJDR)/Vhelloworldlite__ALL.a
-	$(CXX) $(FLAGS) $(INCS) $^ -o $@
+	$(CXX) $(FLAGS) $(INCS) $^ -lpthread -o $@
 ## }}}
 
 #
@@ -172,7 +172,7 @@ SPCHSRCS:= speechtest.cpp uartsim.cpp
 SPCHOBJ := $(subst .cpp,.o,$(SPCHSRCS))
 SPCHOBJS:= $(addprefix $(OBJDIR)/,$(SPCHOBJ)) $(VLIB)
 speechtest: speech.hex $(SPCHOBJS) $(VOBJDR)/Vspeechfifo__ALL.a 
-	$(CXX) $(FLAGS) $(INCS) $(SPCHOBJS) $(VOBJDR)/Vspeechfifo__ALL.a -o $@
+	$(CXX) $(FLAGS) $(INCS) $(SPCHOBJS) $(VOBJDR)/Vspeechfifo__ALL.a -lpthread -o $@
 ## }}}
 
 ## speechtestlite
@@ -184,7 +184,7 @@ $(OBJDIR)/speechtestlite.o: speechtest.cpp
 SPCHLTOBJ := speechtestlite.o uartsim.o
 SPCHLTOBJS:= $(addprefix $(OBJDIR)/,$(SPCHLTOBJ)) $(VLIB)
 speechtestlite: speech.hex $(SPCHLTOBJS) $(VOBJDR)/Vspeechfifolite__ALL.a 
-	$(CXX) $(FLAGS) $(INCS) $(SPCHLTOBJS) $(VOBJDR)/Vspeechfifolite__ALL.a -o $@
+	$(CXX) $(FLAGS) $(INCS) $(SPCHLTOBJS) $(VOBJDR)/Vspeechfifolite__ALL.a -lpthread -o $@
 ## }}}
 
 ## test
@@ -230,8 +230,10 @@ tags:	$(SOURCES) $(HEADERS)
 
 .PHONY: clean
 clean:
-	rm -f  ./linetest ./helloworld ./speechtest
-	rm -f ./mkspeech ./speech.hex
+	rm -f ./mkspeech   ./speech.hex
+	rm -f ./linetest   ./linetestlite
+	rm -f ./helloworld ./helloworldlite
+	rm -f ./speechtest ./speechtestlite
 	rm -rf $(OBJDIR)/
 
 ifneq ($(MAKECMDGOALS),clean)
