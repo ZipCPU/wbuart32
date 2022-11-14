@@ -208,7 +208,7 @@ define	build-depends
 endef
 
 .PHONY: depends
-depends: tags
+depends:
 	$(build-depends)
 
 $(OBJDIR)/depends.txt: depends
