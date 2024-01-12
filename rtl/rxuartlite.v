@@ -304,6 +304,10 @@ module rxuartlite #(
 	always @(*)
 		assume(i_clk == f_rx_clock[1]);
 
+	always @(posedge gbl_clk)
+	if (!$rose(i_clk))
+		assume(!$fell(i_reset));
+
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -345,13 +349,25 @@ module rxuartlite #(
 
 	initial	assume(i_uart_rx);
 
+	always @(*)
+	if (i_reset)
+		assume(i_uart_rx);
+
 	////////////////////////////////////////////////////////////////////////
 	//
 	// The simulated timing generator
 
 	always @(*)
-	if (f_tx_busy)
+	if (i_reset)
+		assume(!f_tx_busy);
+
+	always @(*)
+	if (f_tx_busy || i_reset)
 		assume(!f_tx_start);
+
+	always @(*)
+	if (i_reset)
+		assume(f_tx_baud == CLOCKS_PER_BAUD-1);
 
 	initial	f_tx_baud = 0;
 	always @(posedge f_txclk)
@@ -527,8 +543,10 @@ module rxuartlite #(
 	// rx clocks
 	initial	f_rx_count = 0;
 	always @(posedge i_clk)
-	if (state == RXUL_IDLE)
-		f_rx_count = (!ck_uart) ? (chg_counter+2) : 0;
+	if (i_reset)
+		f_rx_count <= 0;
+	else if (state == RXUL_IDLE)
+		f_rx_count <= (!ck_uart) ? (chg_counter+2) : 0;
 	else
 		f_rx_count <= f_rx_count + 1'b1;
 
@@ -595,7 +613,8 @@ module rxuartlite #(
 	// Calculate an absolute value of the difference between the two baud
 	// clocks
 	always @(posedge i_clk)
-	if ((f_past_valid)&&($past(state)==RXUL_IDLE)&&(state == RXUL_IDLE))
+	if (f_past_valid && !$past(i_reset)
+			&& $past(state)==RXUL_IDLE &&(state == RXUL_IDLE))
 	begin
 		assert(($past(ck_uart))
 			||(chg_counter <=
@@ -627,8 +646,14 @@ module rxuartlite #(
 	initial	q_tx_clock = 0;
 	initial	ck_tx_clock = 0;
 	always @(posedge gbl_clk)
+	if (!f_past_valid || i_reset)
+		{ ck_tx_clock, q_tx_clock } <= 0;
+	else
 		{ ck_tx_clock, q_tx_clock } <= { q_tx_clock, f_tx_clock };
 	always @(posedge gbl_clk)
+	if (!f_past_valid || i_reset)
+		{ ck_tx_count, q_tx_count } <= 0;
+	else
 		{ ck_tx_count, q_tx_count } <= { q_tx_count, f_tx_count };
 
 
@@ -655,47 +680,50 @@ module rxuartlite #(
 		assert((!f_tx_busy)||(f_tx_reg[9:1] == 0));
 
 	always @(posedge gbl_clk)
-	if (state == RXUL_IDLE)
+	if (f_past_valid && !$past(i_reset))
 	begin
-		assert((!f_tx_busy)||(f_tx_reg[9])||(f_tx_reg[9:1]==0));
-		if (ck_uart)
-			assert((f_tx_reg[9:1]==0)||(f_tx_count < (3 + CLOCKS_PER_BAUD/2)));
-	end else if (state == 0)
-	begin
-		assert(f_sub_baud_difference
-				<=  2 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
-	end else if (state == 1)
-	begin
-		assert(f_sub_baud_difference
-				<=  3 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
-	end else if (state == 2)
-	begin
-		assert(f_sub_baud_difference
-				<=  4 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
-	end else if (state == 3)
-	begin
-		assert(f_sub_baud_difference
-				<=  5 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
-	end else if (state == 4)
-	begin
-		assert(f_sub_baud_difference
-				<=  6 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
-	end else if (state == 5)
-	begin
-		assert(f_sub_baud_difference
-				<=  7 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
-	end else if (state == 6)
-	begin
-		assert(f_sub_baud_difference
+		if (state == RXUL_IDLE)
+		begin
+			assert((!f_tx_busy)||(f_tx_reg[9])||(f_tx_reg[9:1]==0));
+			if (ck_uart)
+				assert((f_tx_reg[9:1]==0)||(f_tx_count < (3 + CLOCKS_PER_BAUD/2)));
+		end else if (state == 0)
+		begin
+			assert(f_sub_baud_difference
+					<=  2 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
+		end else if (state == 1)
+		begin
+			assert(f_sub_baud_difference
+					<=  3 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
+		end else if (state == 2)
+		begin
+			assert(f_sub_baud_difference
+					<=  4 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
+		end else if (state == 3)
+		begin
+			assert(f_sub_baud_difference
+					<=  5 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
+		end else if (state == 4)
+		begin
+			assert(f_sub_baud_difference
+					<=  6 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
+		end else if (state == 5)
+		begin
+			assert(f_sub_baud_difference
+					<=  7 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
+		end else if (state == 6)
+		begin
+			assert(f_sub_baud_difference
 				<=  8 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
-	end else if (state == 7)
-	begin
-		assert(f_sub_baud_difference
-				<=  9 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
-	end else if (state == 8)
-	begin
-		assert(f_sub_baud_difference
-				<= 10 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
+		end else if (state == 7)
+		begin
+			assert(f_sub_baud_difference
+					<=  9 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
+		end else if (state == 8)
+		begin
+			assert(f_sub_baud_difference
+					<= 10 * ((CLOCKS_PER_BAUD<<F_CKRES)/20));
+		end
 	end
 
 	always @(posedge i_clk)
@@ -730,6 +758,7 @@ module rxuartlite #(
 		cover(o_wr); // Step 626, takes about 20mins
 
 	always @(posedge i_clk)
+	if (!i_reset && f_past_valid && !$past(i_reset))
 	begin
 		cover(!ck_uart);
 		cover((f_past_valid)&&($rose(ck_uart)));               //  82

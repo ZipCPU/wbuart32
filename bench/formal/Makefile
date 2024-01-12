@@ -103,6 +103,9 @@ $(AXIL)_cvrs/PASS:   $(AXILDEPS)
 	sby -f $(AXIL).sby cvrs
 ## }}}
 
+.PHONY: report
+report:
+	+perl genreport.pl > report.html
 ## Clean
 ## {{{
 .PHONY: clean

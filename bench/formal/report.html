@@ -1,0 +1,22 @@
+<HTML><HEAD><TITLE>Formal Verification Report</TITLE></HEAD>
+<BODY>
+<H1 align=center>Wishbone UART Verification Report</H1>
+<H2 align=center>20240112</H2>
+<TABLE border>
+<TR><TH>Status</TH><TH>Component</TD><TH>Proof</TH><TH>Component description</TH></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>axiluart</TD><TD>_prf</TD><TD rowspan=4>AXI-Lite UART peripheral</TD></TR>
+<TR><TD bgcolor=#caeec8>6 Cover points</TD><TD>axiluart</TD><TD>_cvr</TD></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>axiluart</TD><TD>_prfs</TD></TR>
+<TR><TD bgcolor=#caeec8>6 Cover points</TD><TD>axiluart</TD><TD>_cvrs</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>rxuartlite</TD><TD>_prf</TD><TD rowspan=2>UART Receiver, lite version</TD></TR>
+<TR><TD bgcolor=#caeec8>13 Cover points</TD><TD>rxuartlite</TD><TD>_cvr</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>1 Cover points</TD><TD>txuartlite</TD><TD>_cvr</TD><TD rowspan=2>UART Transmitter, lite version</TD></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>txuartlite</TD><TD>_prf</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>ufifo</TD><TD>_prf</TD><TD rowspan=2>A synchronous FIFO supporting the UART</TD></TR>
+<TR><TD bgcolor=#caeec8>3 Cover points</TD><TD>ufifo</TD><TD>_cvr</TD></TR>
+</TABLE>
+</BODY></HTML>

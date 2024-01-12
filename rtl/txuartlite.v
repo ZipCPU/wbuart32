@@ -296,11 +296,13 @@ module txuartlite #(
 		assert(zero_baud_counter == (baud_counter == 0));
 
 	always @(posedge i_clk)
-	if ((f_past_valid)&&($past(baud_counter != 0))&&($past(state != TXUL_IDLE)))
+	if (f_past_valid && !$past(i_reset) && $past(baud_counter != 0)
+			&& $past(state != TXUL_IDLE))
 		assert(baud_counter == $past(baud_counter - 1'b1));
 
 	always @(posedge i_clk)
-	if ((f_past_valid)&&(!$past(zero_baud_counter))&&($past(state != TXUL_IDLE)))
+	if (f_past_valid && !$past(i_reset) && !$past(zero_baud_counter)
+			&& $past(state != TXUL_IDLE))
 		assert($stable(o_uart_tx));
 
 	initial	f_baud_count = 1'b0;
@@ -325,8 +327,8 @@ module txuartlite #(
 		f_txbits <= { o_uart_tx, f_txbits[9:1] };
 
 	always @(posedge i_clk)
-	if ((f_past_valid)&&(!$past(zero_baud_counter))
-			&&(!$past(state==TXUL_IDLE)))
+	if (f_past_valid && !$past(i_reset)&& !$past(zero_baud_counter)
+			&& !$past(state==TXUL_IDLE))
 		assert(state == $past(state));
 
 	initial	f_bitcount = 0;
