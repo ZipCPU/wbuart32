@@ -12,6 +12,7 @@ smtbmc boolector
 
 [script]
 read -formal -DTXUARTLITE txuartlite.v
+proc -norom
 prep -top txuartlite
 
 [files]

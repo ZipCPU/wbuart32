@@ -46,7 +46,7 @@
 ##
 ################################################################################
 ## }}}
-## Copyright (C) 2015-2022, Gisselquist Technology, LLC
+## Copyright (C) 2015-2024, Gisselquist Technology, LLC
 ## {{{
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
@@ -189,6 +189,12 @@ speechtestlite: speech.hex $(SPCHLTOBJS) $(VOBJDR)/Vspeechfifolite__ALL.a
 
 ## test
 ## {{{
+
+test:
+#
+#
+# The "test" target, attempts to check if our core does what it should
+# without any user interaction
 test: linetest linetestlite helloworld helloworldlite speechtest speechtestlite
 	./linetest
 	./linetestlite
@@ -217,6 +223,13 @@ depends:
 $(OBJDIR)/depends.txt: depends
 
 #
+# Make sure the $(OBJDIR)/ directory exists.  This has taken some work to get
+# right.  While "mkdir -p $(OBJDIR)" could be used to do this as well, it
+# always bothered me that it seemed to be perpetually running.  Hence, we'll
+# first check if the directory exists, and only create it if it does not.
+# Finally, by adding the @ in front of the bash command, it won't get printed
+# to the screen.  That way ... I can run it as often as I want without getting
+# annoyed by it.  ;)
 define	mk-objdir
 	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR); fi"
 endef
@@ -228,6 +241,9 @@ tags:	$(SOURCES) $(HEADERS)
 	@echo "Generating tags"
 	@ctags $(SOURCES) $(HEADERS)
 
+#
+# The "clean" target, removing any and all remaining build (and test) products
+#
 .PHONY: clean
 clean:
 	rm -f ./mkspeech   ./speech.hex
@@ -236,6 +252,9 @@ clean:
 	rm -f ./speechtest ./speechtestlite
 	rm -rf $(OBJDIR)/
 
+# Include our generated dependency file.  The "-" in front of the include
+# basically tells "make" to include it if it can, and ignore it if it cannot
+# be included (i.e. if it doesn't exist)
 ifneq ($(MAKECMDGOALS),clean)
 -include $(OBJDIR)/depends.txt
 endif

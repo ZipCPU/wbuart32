@@ -25,7 +25,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2022, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -64,7 +64,7 @@ module txuartlite #(
 		// }}}
 	) (
 		// {{{
-		input	wire		i_clk,
+		input	wire		i_clk, i_reset,
 		input	wire		i_wr,
 		input	wire	[7:0]	i_data,
 		// And the UART input line itself
@@ -101,27 +101,29 @@ module txuartlite #(
 	initial	r_busy = 1'b1;
 	initial	state  = TXUL_IDLE;
 	always @(posedge i_clk)
+	if (i_reset)
 	begin
-		if (!zero_baud_counter)
-			// r_busy needs to be set coming into here
+		r_busy <= 1'b1;
+		state  <= TXUL_IDLE;
+	end else if (!zero_baud_counter)
+		// r_busy needs to be set coming into here
+		r_busy <= 1'b1;
+	else if (state > TXUL_STOP)	// STATE_IDLE
+	begin
+		state <= TXUL_IDLE;
+		r_busy <= 1'b0;
+		if ((i_wr)&&(!r_busy))
+		begin	// Immediately start us off with a start bit
 			r_busy <= 1'b1;
-		else if (state > TXUL_STOP)	// STATE_IDLE
-		begin
-			state <= TXUL_IDLE;
-			r_busy <= 1'b0;
-			if ((i_wr)&&(!r_busy))
-			begin	// Immediately start us off with a start bit
-				r_busy <= 1'b1;
-				state <= TXUL_BIT_ZERO;
-			end
-		end else begin
-			// One clock tick in each of these states ...
-			r_busy <= 1'b1;
-			if (state <=TXUL_STOP) // start bit, 8-d bits, stop-b
-				state <= state + 1'b1;
-			else
-				state <= TXUL_IDLE;
+			state <= TXUL_BIT_ZERO;
 		end
+	end else begin
+		// One clock tick in each of these states ...
+		r_busy <= 1'b1;
+		if (state <=TXUL_STOP) // start bit, 8-d bits, stop-b
+			state <= state + 1'b1;
+		else
+			state <= TXUL_IDLE;
 	end
 	// }}}
 
@@ -147,10 +149,12 @@ module txuartlite #(
 	// we simple logically shift the register right to grab the next bit.
 	initial	lcl_data = 8'hff;
 	always @(posedge i_clk)
-		if ((i_wr)&&(!r_busy))
-			lcl_data <= i_data;
-		else if (zero_baud_counter)
-			lcl_data <= { 1'b1, lcl_data[7:1] };
+	if (i_reset)
+		lcl_data <= 8'hff;
+	else if (i_wr && !r_busy)
+		lcl_data <= i_data;
+	else if (zero_baud_counter)
+		lcl_data <= { 1'b1, lcl_data[7:1] };
 	// }}}
 
 	// o_uart_tx
@@ -162,10 +166,12 @@ module txuartlite #(
 	//
 	initial	o_uart_tx = 1'b1;
 	always @(posedge i_clk)
-		if ((i_wr)&&(!r_busy))
-			o_uart_tx <= 1'b0;	// Set the start bit on writes
-		else if (zero_baud_counter)	// Set the data bit.
-			o_uart_tx <= lcl_data[0];
+	if (i_reset)
+		o_uart_tx <= 1'b1;
+	else if (i_wr && !r_busy)
+		o_uart_tx <= 1'b0;	// Set the start bit on writes
+	else if (zero_baud_counter)	// Set the data bit.
+		o_uart_tx <= lcl_data[0];
 	// }}}
 
 	// Baud counter
@@ -213,8 +219,13 @@ module txuartlite #(
 	initial	zero_baud_counter = 1'b1;
 	initial	baud_counter = 0;
 	always @(posedge i_clk)
+	if (i_reset)
 	begin
+		zero_baud_counter <= 1'b1;
+		baud_counter <= 0;
+	end else begin
 		zero_baud_counter <= (baud_counter == 1);
+
 		if (state == TXUL_IDLE)
 		begin
 			baud_counter <= 0;

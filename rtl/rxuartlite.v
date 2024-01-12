@@ -21,7 +21,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2022, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -73,7 +73,7 @@ module rxuartlite #(
 		// }}}
 	) (
 		// {{{
-		input	wire		i_clk,
+		input	wire		i_clk, i_reset,
 		input	wire		i_uart_rx,
 		output	reg		o_wr,
 		output	reg	[7:0]	o_data
@@ -105,6 +105,9 @@ module rxuartlite #(
 	initial	qq_uart = 1'b1;
 	initial	ck_uart = 1'b1;
 	always @(posedge i_clk)
+	if (i_reset)
+		{ ck_uart, qq_uart, q_uart } <= 3'b111;
+	else
 		{ ck_uart, qq_uart, q_uart } <= { qq_uart, q_uart, i_uart_rx };
 	// }}}
 
@@ -116,7 +119,9 @@ module rxuartlite #(
 	// condition, as discussed further below.
 	initial	chg_counter = {(TB){1'b1}};
 	always @(posedge i_clk)
-	if (qq_uart != ck_uart)
+	if (i_reset)
+		chg_counter <= {(TB){1'b1}};
+	else if (qq_uart != ck_uart)
 		chg_counter <= 0;
 	else if (chg_counter != { (TB){1'b1} })
 		chg_counter <= chg_counter + 1;
@@ -130,6 +135,9 @@ module rxuartlite #(
 	// state.
 	initial	half_baud_time = 0;
 	always @(posedge i_clk)
+	if (i_reset)
+		half_baud_time <= 0;
+	else
 		half_baud_time <= (!ck_uart)&&(chg_counter >= half_baud-1'b1-1'b1);
 	// }}}
 
@@ -137,7 +145,10 @@ module rxuartlite #(
 	// {{{
 	initial	state = RXUL_IDLE;
 	always @(posedge i_clk)
-	if (state == RXUL_IDLE)
+	if (i_reset)
+	begin
+		state <= RXUL_IDLE;
+	end else if (state == RXUL_IDLE)
 	begin // Idle state, independent of baud counter
 		// {{{
 		// By default, just stay in the IDLE state
@@ -185,7 +196,11 @@ module rxuartlite #(
 	initial	o_wr = 1'b0;
 	initial	o_data = 8'h00;
 	always @(posedge i_clk)
-	if ((zero_baud_counter)&&(state == RXUL_STOP)&&(ck_uart))
+	if (i_reset)
+	begin
+		o_wr <= 1'b0;
+		o_data <= 8'h00;
+	end else if ((zero_baud_counter)&&(state == RXUL_STOP)&&(ck_uart))
 	begin
 		o_wr   <= 1'b1;
 		o_data <= data_reg;
@@ -201,7 +216,9 @@ module rxuartlite #(
 	// intervals.
 	initial	baud_counter = 0;
 	always @(posedge i_clk)
-	if (((state==RXUL_IDLE))&&(!ck_uart)&&(half_baud_time))
+	if (i_reset)
+		baud_counter <= 0;
+	else if (((state==RXUL_IDLE))&&(!ck_uart)&&(half_baud_time))
 		baud_counter <= CLOCKS_PER_BAUD-1'b1;
 	else if (state == RXUL_WAIT)
 		baud_counter <= 0;
@@ -219,7 +236,9 @@ module rxuartlite #(
 	// before--cleaning up some otherwise difficult timing dependencies.
 	initial	zero_baud_counter = 1'b1;
 	always @(posedge i_clk)
-	if ((state == RXUL_IDLE)&&(!ck_uart)&&(half_baud_time))
+	if (i_reset)
+		zero_baud_counter <= 1'b1;
+	else if ((state == RXUL_IDLE)&&(!ck_uart)&&(half_baud_time))
 		zero_baud_counter <= 1'b0;
 	else if (state == RXUL_WAIT)
 		zero_baud_counter <= 1'b1;

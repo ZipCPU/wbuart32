@@ -69,7 +69,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2022, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -179,8 +179,14 @@ module txuart #(
 	// initial	qq_cts_n = 1'b1;
 	// initial	ck_cts   = 1'b0;
 	always	@(posedge i_clk)
+	if (i_reset)
+		{ qq_cts_n, q_cts_n } <= 2'b11;
+	else
 		{ qq_cts_n, q_cts_n } <= { q_cts_n, i_cts_n };
 	always	@(posedge i_clk)
+	if (i_reset)
+		ck_cts <= 1'b0;
+	else
 		ck_cts <= (!qq_cts_n)||(!hw_flow_control);
 	// }}}
 
@@ -385,14 +391,20 @@ module txuart #(
 	initial	zero_baud_counter = 1'b0;
 	initial	baud_counter = 28'h05;
 	always @(posedge i_clk)
+	if (i_reset)
 	begin
+		// Give ourselves 16 bauds before being ready
+		baud_counter <= { INITIAL_SETUP[23:0], 4'h0 };
+		zero_baud_counter <= 1'b0;
+	end else if (i_break)
+	begin
+		// Give ourselves 16 bauds before being ready
+		baud_counter <= break_condition;
+		zero_baud_counter <= 1'b0;
+	end else begin
 		zero_baud_counter <= (baud_counter == 28'h01);
-		if ((i_reset)||(i_break))
-		begin
-			// Give ourselves 16 bauds before being ready
-			baud_counter <= break_condition;
-			zero_baud_counter <= 1'b0;
-		end else if (!zero_baud_counter)
+
+		if (!zero_baud_counter)
 			baud_counter <= baud_counter - 28'h01;
 		else if (state == TXU_BREAK)
 		begin
@@ -418,7 +430,9 @@ module txuart #(
 	// {{{
 	initial	last_state = 1'b0;
 	always @(posedge i_clk)
-	if (dblstop)
+	if (i_reset)
+		last_state <= 1'b0;
+	else if (dblstop)
 		last_state <= (state == TXU_SECOND_STOP);
 	else
 		last_state <= (state == TXU_STOP);
