@@ -71,7 +71,7 @@
 ##
 ##
 CXX	:= g++
-FLAGS	:= -std=c++11 -Wall -Og -g
+FLAGS	:= -Wall -Og -g
 OBJDIR  := obj-pc
 RTLD	:= ../verilog
 VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
